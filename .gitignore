@@ -1,0 +1,98 @@
+# Python Wrapper Generated Files
+wrapper/build/
+wrapper/dist/
+wrapper/dtw.egg-info/
+
+# Object files
+*.o
+*.so
+libClarity.so*
+*.obj
+
+# Executables
+magenta_index
+magenta_ml_dtw
+
+#kmer files
+kmer_models/
+
+#python files
+*.pyc
+
+#txt docs
+*.txt
+
+#executables
+magenta_bulk_index
+magenta_index
+magenta
+magenta_multi_index
+magenta_ml_dtw
+check_bulk_data
+ont_simple_client
+flash_test
+magenta_short_index
+fasta2signal
+fasta2prefixes
+tests/magenta_utils_test
+tests/flash_utils_test
+tests/UCR_Suite/UCR_DTW
+tests/UCR_Suite/UCR_DTW_BIN
+tests/UCR_Suite/UCR_ED
+tests/UCR_Suite/UCR_ED_BIN
+tests/flash_dtw_test
+tests/segmentation_test
+segment_data
+*.exe
+*.out
+
+#tests
+tests/tests/
+
+#dll files
+*.dll
+
+#lib files
+*.lib
+
+#exp files
+*.exp
+
+#pdb files
+*.pdb
+
+#test-related directories and files
+tests/output_tests/
+
+#bak files
+*.bak
+
+#.vs folder
+.vs/
+
+#grpc files
+include/minknow_api/*.pb.h
+include/minknow_api/*.pb.cc
+
+#lib directory
+lib\
+
+#bin directory
+bin/
+
+#bin files
+sample_data/E_coli/*.bin*
+
+#Visual Studio files
+*.sln
+*.VC*
+
+#Linux files
+*.nfs*
+
+#R data
+tests/.RData
+tests/.Rhistory
+
+#log folder
+log/

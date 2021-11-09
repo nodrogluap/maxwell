@@ -1,0 +1,12 @@
+[submodule "submodules/grpc"]
+	path = submodules/grpc
+	url = https://github.com/grpc/grpc.git
+[submodule "submodules/hdf5"]
+	path = submodules/hdf5
+	url = https://github.com/HDFGroup/hdf5.git
+[submodule "submodules/minknow_api"]
+	path = submodules/minknow_api
+	url = https://github.com/nanoporetech/minknow_api.git
+[submodule "submodules/pthread-win32"]
+	path = submodules/pthread-win32
+	url = https://github.com/GerHobbelt/pthread-win32.git
