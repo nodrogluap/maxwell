@@ -10,3 +10,6 @@
 [submodule "submodules/pthread-win32"]
 	path = submodules/pthread-win32
 	url = https://github.com/GerHobbelt/pthread-win32.git
+[submodule "submodules/vbz_compression"]
+	path = submodules/vbz_compression
+	url = https://github.com/nanoporetech/vbz_compression.git
