@@ -15,6 +15,13 @@ Replay an existing bulk fast5 file.
 Start Maxwell.
 
 
+## Getting the source code
+Maxwell depends on a number of external libraries, which are compiled from source to build a standalone executable. When cloning this repository, be sure to include all the submodules like so:
+
+```
+git clone --recurse-submodules https://github.com/nodrogluap/maxwell
+```
+
 ## Compilation Dependencies (Linux)
 This repository requires that you have the following installed to compile properly:
 - [Boost C++ Libraries](https://www.boost.org/)
