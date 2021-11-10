@@ -26,7 +26,7 @@ git clone --recurse-submodules https://github.com/nodrogluap/maxwell
 This repository requires that you have the following installed to compile properly:
 - [Boost C++ Libraries](https://www.boost.org/)
 - [CUDA Development Tools](https://developer.nvidia.com/cuda-toolkit) are required to use nvcc
-- All Linux dependencies for building gRPC as listed [here](grpc/INSTALL.md)
+- All Linux dependencies for building gRPC as listed [here](https://github.com/grpc/grpc/blob/master/BUILDING.md)
 
 ## Compilation Dependencies (Windows)
 This repository requires that you have the following installed to compile properly:
