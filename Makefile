@@ -1,5 +1,7 @@
 #----General Definitions----#
 
+PROGNAME=maxwell
+
 #----Compilers----#
 
 NVCC= nvcc
@@ -19,7 +21,8 @@ RPC=include/minknow_api
 
 #----ont flags----#
 
-ONT_CLIENT_FILES=$(RPC)/acquisition.grpc.pb.cc $(RPC)/acquisition.pb.cc $(RPC)/analysis_configuration.grpc.pb.cc $(RPC)/analysis_configuration.pb.cc $(RPC)/data.grpc.pb.cc $(RPC)/data.pb.cc $(RPC)/device.grpc.pb.cc $(RPC)/device.pb.cc $(RPC)/instance.grpc.pb.cc $(RPC)/instance.pb.cc $(RPC)/keystore.grpc.pb.cc $(RPC)/keystore.pb.cc $(RPC)/log.grpc.pb.cc $(RPC)/log.pb.cc $(RPC)/manager.grpc.pb.cc $(RPC)/manager.pb.cc $(RPC)/minion_device.grpc.pb.cc $(RPC)/minion_device.pb.cc $(RPC)/promethion_device.grpc.pb.cc $(RPC)/promethion_device.pb.cc $(RPC)/protocol.grpc.pb.cc $(RPC)/protocol.pb.cc $(RPC)/rpc_options.pb.cc $(RPC)/statistics.grpc.pb.cc $(RPC)/statistics.pb.cc
+# ONT_CLIENT_FILES=$(RPC)/acquisition.grpc.pb.cc $(RPC)/acquisition.pb.cc $(RPC)/analysis_configuration.grpc.pb.cc $(RPC)/analysis_configuration.pb.cc $(RPC)/data.grpc.pb.cc $(RPC)/data.pb.cc $(RPC)/device.grpc.pb.cc $(RPC)/device.pb.cc $(RPC)/instance.grpc.pb.cc $(RPC)/instance.pb.cc $(RPC)/keystore.grpc.pb.cc $(RPC)/keystore.pb.cc $(RPC)/log.grpc.pb.cc $(RPC)/log.pb.cc $(RPC)/manager.grpc.pb.cc $(RPC)/manager.pb.cc $(RPC)/minion_device.grpc.pb.cc $(RPC)/minion_device.pb.cc $(RPC)/promethion_device.grpc.pb.cc $(RPC)/promethion_device.pb.cc $(RPC)/protocol.grpc.pb.cc $(RPC)/protocol.pb.cc $(RPC)/rpc_options.pb.cc $(RPC)/statistics.grpc.pb.cc $(RPC)/statistics.pb.cc
+ONT_CLIENT_FILES=$(RPC)/acquisition.grpc.pb.o $(RPC)/acquisition.pb.o $(RPC)/analysis_configuration.grpc.pb.o $(RPC)/analysis_configuration.pb.o $(RPC)/data.grpc.pb.o $(RPC)/data.pb.o $(RPC)/device.grpc.pb.o $(RPC)/device.pb.o $(RPC)/instance.grpc.pb.o $(RPC)/instance.pb.o $(RPC)/keystore.grpc.pb.o $(RPC)/keystore.pb.o $(RPC)/log.grpc.pb.o $(RPC)/log.pb.o $(RPC)/manager.grpc.pb.o $(RPC)/manager.pb.o $(RPC)/minion_device.grpc.pb.o $(RPC)/minion_device.pb.o $(RPC)/promethion_device.grpc.pb.o $(RPC)/promethion_device.pb.o $(RPC)/protocol.grpc.pb.o $(RPC)/protocol.pb.o $(RPC)/rpc_options.pb.o $(RPC)/statistics.grpc.pb.o $(RPC)/statistics.pb.o
 
 #----Linux----#
 
@@ -56,7 +59,9 @@ CARES_LIB_LINUX=$(DIR)/submodules/grpc/cmake/build/third_party/cares/cares/lib
 
 #----Include Flags----#
 
-HDF5_FLAGS_LINUX=-l:libhdf5.a
+HDF5_LIBNAME=libhdf5.a
+
+HDF5_FLAGS_LINUX=-l:$(HDF5_LIBNAME)
 ZLIB_FLAGS_LINUX=-l:libz.a
 GRPC_FLAGS_LINUX=-l:libgrpc++.a -l:libgrpc.a -l:libaddress_sorting.a -l:libupb.a -l:libgpr.a
 PROTO_FLAGS_LINUX=-l:libprotobuf.a -l:libprotoc.a
@@ -99,17 +104,49 @@ FLASH_TEST_DEBUG= $(CUDA_DEBUG) $(DEBUG) -maxrregcount 26
 	
 #----make objects for simple (linux)----#
 
-minknow_obs: $(ONT_CLIENT_FILES)
-	cd include/minknow_api/; $(CC) $(CXX11) -I$(INCLUDE) -I$(INCLUDE_GRPC_LINUX) -I$(INCLUDE_ABSEIL_LINUX) -I$(INCLUDE_GOOGLE_LINUX) -c *.cc; cd ../..
+all: $(PROGNAME)
 
-ReadUntilClient.o: $(ONT_CLIENT_FILES) ReadUntilClient.cpp ReadUntilClient.h algo_datatypes.h Connection.h
+clean:
+	rm -rf bin/lib include/minknow_api submodules/grpc/cmake/build ReadUntilClient.o $(PROGNAME); \
+	cd submodules/hdf5; \
+	git clean -fd
+
+$(DIR)/submodules/grpc/cmake/build/grpc_cpp_plugin:
+	mkdir -p bin/lib; \
+	mkdir log; \
+	cd submodules/grpc; \
+	mkdir -p cmake/build; \
+	cd cmake/build; \
+	CFLAGS=-Wno-error LDFLAGS=-lrt cmake ../..; \
+	make; \
+	cd third_party/zlib; \
+	ln -s ../../../../third_party/zlib include
+
+$(DIR)/submodules/grpc/cmake/build/third_party/protobuf/protoc: $(DIR)/submodules/grpc/cmake/build/grpc_cpp_plugin
+
+$(DIR)/submodules/grpc/cmake/build/third_party/zlib/libz.a: $(DIR)/submodules/grpc/cmake/build/grpc_cpp_plugin
+	
+%.pb.cc: $(DIR)/submodules/grpc/cmake/build/third_party/protobuf/protoc $(DIR)/submodules/minknow_api/proto/minknow_api/*.proto
+	$(DIR)/submodules/grpc/cmake/build/third_party/protobuf/protoc -I $(DIR)/submodules/minknow_api/proto/ -I $(DIR)/submodules/grpc/third_party/protobuf/src/ --grpc_out=$(DIR)/include/ --plugin=protoc-gen-grpc=$(DIR)/submodules/grpc/cmake/build/grpc_cpp_plugin $(DIR)/submodules/minknow_api/proto/minknow_api/*.proto; \
+	$(DIR)/submodules/grpc/cmake/build/third_party/protobuf/protoc -I $(DIR)/submodules/minknow_api/proto/ -I $(DIR)/submodules/grpc/third_party/protobuf/src/ --cpp_out=$(DIR)/include/ $(DIR)/submodules/minknow_api/proto/minknow_api/*.proto
+
+$(HDF5_LIB_LINUX)/$(HDF5_LIBNAME): $(DIR)/submodules/grpc/cmake/build/third_party/zlib/libz.a
+	cd submodules/hdf5; \
+	./configure --enable-cxx --enable-fortran --with-zlib=$(DIR)/submodules/grpc/cmake/build/third_party/zlib; \
+	make -j 8; \
+	make install
+
+%.pb.o : %.pb.cc
+	$(CC) $(CXX11) -I$(INCLUDE) -I$(INCLUDE_GRPC_LINUX) -I$(INCLUDE_ABSEIL_LINUX) -I$(INCLUDE_GOOGLE_LINUX) -c $< -o $@
+
+ReadUntilClient.o: ReadUntilClient.cpp ReadUntilClient.h algo_datatypes.h Connection.h
 	$(CC) $(CXX11) -I$(INCLUDE) -I$(INCLUDE_GRPC_LINUX) -I$(INCLUDE_ABSEIL_LINUX) -I$(INCLUDE_GOOGLE_LINUX) -c ReadUntilClient.cpp 
 
-libReadUntilClient.a: ReadUntilClient.o minknow_obs
-	ar rcs $(SO_LIB_PATH)/libReadUntilClient.a ReadUntilClient.o $(RPC)/*.o
+$(SO_LIB_PATH)/libReadUntilClient.a: $(ONT_CLIENT_FILES) ReadUntilClient.o 
+	ar rcs $(SO_LIB_PATH)/libReadUntilClient.a ReadUntilClient.o $(ONT_CLIENT_FILES)
 
-ont_simple_client: ont_simple_client.cu thread.o cuda_utils.h wqueue.h libReadUntilClient.a flash_dtw.cuh flash_dtw_utils.cuh
-	$(NVCC) -ccbin `which $(CC) | xargs dirname` $(CXX11) -DHDF5_SUPPORTED=1 -I$(INCLUDE) -I$(INCLUDE_HDF5_LINUX) ont_simple_client.cu thread.o -o ont_simple_client -L$(SO_LIB_PATH) -lReadUntilClient -L$(GRPC_LIB_LINUX) $(GRPC_FLAGS_LINUX) -L$(PROTOBUF_LIB_LINUX) $(PROTO_FLAGS_LINUX) -L$(ABSL_STRINGS_LIB_LINUX) $(ABSL_STRINGS_FLAGS_LINUX) -L$(ABSL_NUM_LIB_LINUX) $(ABSL_NUM_FLAGS_LINUX) -L$(ABSL_SYNC_LIB_LINUX) $(ABSL_SYNC_FLAGS_LINUX) -L$(ABSL_DEBUG_LIB_LINUX) $(ABSL_DEBUG_FLAGS_LINUX) -L$(ABSL_HASH_LIB_LINUX) $(ABSL_HASH_FLAGS_LINUX) -L$(ABSL_BASE_LIB_LINUX) $(ABSL_BASE_FLAGS_LINUX) -L$(ABSL_TIME_LIB_LINUX) $(ABSL_TIME_FLAGS_LINUX) -L$(ABSL_STAT_LIB_LINUX) $(ABSL_STAT_FLAGS_LINUX) -L$(ABSL_TYPES_LIB_LINUX) $(ABSL_TYPES_FLAGS_LINUX) -L$(RE2_LIB_LINUX) $(RE2_FLAGS_LINUX) -L$(BORING_LIB_LINUX) $(BORING_FLAGS_LINUX) -L$(CARES_LIB_LINUX) $(CARES_FLAGS_LINUX) -L$(ZLIB_LIB_LINUX) $(ZLIB_FLAGS_LINUX) -lpthread -lstdc++ -lm -L$(HDF5_LIB_LINUX) $(HDF5_FLAGS_LINUX)
+maxwell: $(HDF5_LIB_LINUX)/$(HDF5_LIBNAME) $(SO_LIB_PATH)/libReadUntilClient.a ont_simple_client.cu thread.o cuda_utils.h wqueue.h flash_dtw.cuh flash_dtw_utils.cuh 
+	$(NVCC) -ccbin `which $(CC) | xargs dirname` $(CXX11) -DHDF5_SUPPORTED=1 -I$(INCLUDE) -I$(INCLUDE_HDF5_LINUX) ont_simple_client.cu thread.o -o maxwell -L$(SO_LIB_PATH) -lReadUntilClient -L$(GRPC_LIB_LINUX) $(GRPC_FLAGS_LINUX) -L$(PROTOBUF_LIB_LINUX) $(PROTO_FLAGS_LINUX) -L$(ABSL_STRINGS_LIB_LINUX) $(ABSL_STRINGS_FLAGS_LINUX) -L$(ABSL_NUM_LIB_LINUX) $(ABSL_NUM_FLAGS_LINUX) -L$(ABSL_SYNC_LIB_LINUX) $(ABSL_SYNC_FLAGS_LINUX) -L$(ABSL_DEBUG_LIB_LINUX) $(ABSL_DEBUG_FLAGS_LINUX) -L$(ABSL_HASH_LIB_LINUX) $(ABSL_HASH_FLAGS_LINUX) -L$(ABSL_BASE_LIB_LINUX) $(ABSL_BASE_FLAGS_LINUX) -L$(ABSL_TIME_LIB_LINUX) $(ABSL_TIME_FLAGS_LINUX) -L$(ABSL_STAT_LIB_LINUX) $(ABSL_STAT_FLAGS_LINUX) -L$(ABSL_TYPES_LIB_LINUX) $(ABSL_TYPES_FLAGS_LINUX) -L$(RE2_LIB_LINUX) $(RE2_FLAGS_LINUX) -L$(BORING_LIB_LINUX) $(BORING_FLAGS_LINUX) -L$(CARES_LIB_LINUX) $(CARES_FLAGS_LINUX) -L$(ZLIB_LIB_LINUX) $(ZLIB_FLAGS_LINUX) -lpthread -lstdc++ -lm -L$(HDF5_LIB_LINUX) $(HDF5_FLAGS_LINUX)
 	
 thread.o: thread.cpp thread.h
 	$(NVCC) -Xcompiler -fPIC -I. -DHAVE_STRUCT_TIMESPEC thread.cpp -c

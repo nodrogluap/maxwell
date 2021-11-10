@@ -9,10 +9,6 @@ wrapper/dtw.egg-info/
 libClarity.so*
 *.obj
 
-# Executables
-magenta_index
-magenta_ml_dtw
-
 #kmer files
 kmer_models/
 
@@ -29,7 +25,7 @@ magenta
 magenta_multi_index
 magenta_ml_dtw
 check_bulk_data
-ont_simple_client
+maxwell
 flash_test
 magenta_short_index
 fasta2signal
