@@ -57,6 +57,8 @@ RE2_LIB_LINUX=$(DIR)/submodules/grpc/cmake/build/third_party/re2
 BORING_LIB_LINUX=$(DIR)/submodules/grpc/cmake/build/third_party/boringssl-with-bazel
 CARES_LIB_LINUX=$(DIR)/submodules/grpc/cmake/build/third_party/cares/cares/lib
 
+VBZ_LIB_LINUX=$(DIR)/submodules/vbz_compression/build/lib
+
 #----Include Flags----#
 
 HDF5_LIBNAME=libhdf5.a
@@ -93,6 +95,9 @@ RE2_FLAGS_LINUX=-l:libre2.a
 BORING_FLAGS_LINUX=-l:libssl.a -l:libcrypto.a
 CARES_FLAGS_LINUX=-l:libcares.a
 
+VBZ_LIBNAME=libvbz.a
+VBZ_FLAGS_LINUX=-l:$(VBZ_LIBNAME)
+
 #----Linux Flags----#
 
 CXX11=-std=c++11
@@ -107,7 +112,7 @@ FLASH_TEST_DEBUG= $(CUDA_DEBUG) $(DEBUG) -maxrregcount 26
 all: $(PROGNAME)
 
 clean:
-	rm -rf bin/lib include/minknow_api submodules/grpc/cmake/build ReadUntilClient.o $(PROGNAME); \
+	rm -rf bin/lib include/minknow_api submodules/grpc/cmake/build submodules/vbz_compression/build ReadUntilClient.o $(PROGNAME); \
 	cd submodules/hdf5; \
 	git clean -fd
 
@@ -135,6 +140,13 @@ $(HDF5_LIB_LINUX)/$(HDF5_LIBNAME): $(DIR)/submodules/grpc/cmake/build/third_part
 	./configure --enable-cxx --enable-fortran --with-zlib=$(DIR)/submodules/grpc/cmake/build/third_party/zlib; \
 	make -j 8; \
 	make install
+	
+$(VBZ_LIB_LINUX)/$(VBZ_LIBNAME): 
+	cd submodules/vbz_compression; \
+	mkdir build; \
+	cd build; \
+	cmake -D CMAKE_BUILD_TYPE=Release -D ENABLE_CONAN=OFF -D ENABLE_PERF_TESTING=OFF -D ENABLE_PYTHON=OFF ..; \
+	make -j
 
 %.pb.o : %.pb.cc
 	$(CC) $(CXX11) -I$(INCLUDE) -I$(INCLUDE_GRPC_LINUX) -I$(INCLUDE_ABSEIL_LINUX) -I$(INCLUDE_GOOGLE_LINUX) -c $< -o $@
@@ -145,8 +157,8 @@ ReadUntilClient.o: ReadUntilClient.cpp ReadUntilClient.h algo_datatypes.h Connec
 $(SO_LIB_PATH)/libReadUntilClient.a: $(ONT_CLIENT_FILES) ReadUntilClient.o 
 	ar rcs $(SO_LIB_PATH)/libReadUntilClient.a ReadUntilClient.o $(ONT_CLIENT_FILES)
 
-maxwell: $(HDF5_LIB_LINUX)/$(HDF5_LIBNAME) $(SO_LIB_PATH)/libReadUntilClient.a ont_simple_client.cu thread.o cuda_utils.h wqueue.h flash_dtw.cuh flash_dtw_utils.cuh 
-	$(NVCC) -ccbin `which $(CC) | xargs dirname` $(CXX11) -DHDF5_SUPPORTED=1 -I$(INCLUDE) -I$(INCLUDE_HDF5_LINUX) ont_simple_client.cu thread.o -o maxwell -L$(SO_LIB_PATH) -lReadUntilClient -L$(GRPC_LIB_LINUX) $(GRPC_FLAGS_LINUX) -L$(PROTOBUF_LIB_LINUX) $(PROTO_FLAGS_LINUX) -L$(ABSL_STRINGS_LIB_LINUX) $(ABSL_STRINGS_FLAGS_LINUX) -L$(ABSL_NUM_LIB_LINUX) $(ABSL_NUM_FLAGS_LINUX) -L$(ABSL_SYNC_LIB_LINUX) $(ABSL_SYNC_FLAGS_LINUX) -L$(ABSL_DEBUG_LIB_LINUX) $(ABSL_DEBUG_FLAGS_LINUX) -L$(ABSL_HASH_LIB_LINUX) $(ABSL_HASH_FLAGS_LINUX) -L$(ABSL_BASE_LIB_LINUX) $(ABSL_BASE_FLAGS_LINUX) -L$(ABSL_TIME_LIB_LINUX) $(ABSL_TIME_FLAGS_LINUX) -L$(ABSL_STAT_LIB_LINUX) $(ABSL_STAT_FLAGS_LINUX) -L$(ABSL_TYPES_LIB_LINUX) $(ABSL_TYPES_FLAGS_LINUX) -L$(RE2_LIB_LINUX) $(RE2_FLAGS_LINUX) -L$(BORING_LIB_LINUX) $(BORING_FLAGS_LINUX) -L$(CARES_LIB_LINUX) $(CARES_FLAGS_LINUX) -L$(ZLIB_LIB_LINUX) $(ZLIB_FLAGS_LINUX) -lpthread -lstdc++ -lm -L$(HDF5_LIB_LINUX) $(HDF5_FLAGS_LINUX)
+maxwell: $(HDF5_LIB_LINUX)/$(HDF5_LIBNAME) $(VBZ_LIB_LINUX)/$(VBZ_LIBNAME) $(SO_LIB_PATH)/libReadUntilClient.a ont_simple_client.cu thread.o cuda_utils.h wqueue.h flash_dtw.cuh flash_dtw_utils.cuh 
+	$(NVCC) -ccbin `which $(CC) | xargs dirname` $(CXX11) -DHDF5_SUPPORTED=1 -I$(INCLUDE) -I$(INCLUDE_HDF5_LINUX) ont_simple_client.cu thread.o -o maxwell -L$(SO_LIB_PATH) -lReadUntilClient -L$(GRPC_LIB_LINUX) $(GRPC_FLAGS_LINUX) -L$(PROTOBUF_LIB_LINUX) $(PROTO_FLAGS_LINUX) -L$(ABSL_STRINGS_LIB_LINUX) $(ABSL_STRINGS_FLAGS_LINUX) -L$(ABSL_NUM_LIB_LINUX) $(ABSL_NUM_FLAGS_LINUX) -L$(ABSL_SYNC_LIB_LINUX) $(ABSL_SYNC_FLAGS_LINUX) -L$(ABSL_DEBUG_LIB_LINUX) $(ABSL_DEBUG_FLAGS_LINUX) -L$(ABSL_HASH_LIB_LINUX) $(ABSL_HASH_FLAGS_LINUX) -L$(ABSL_BASE_LIB_LINUX) $(ABSL_BASE_FLAGS_LINUX) -L$(ABSL_TIME_LIB_LINUX) $(ABSL_TIME_FLAGS_LINUX) -L$(ABSL_STAT_LIB_LINUX) $(ABSL_STAT_FLAGS_LINUX) -L$(ABSL_TYPES_LIB_LINUX) $(ABSL_TYPES_FLAGS_LINUX) -L$(RE2_LIB_LINUX) $(RE2_FLAGS_LINUX) -L$(BORING_LIB_LINUX) $(BORING_FLAGS_LINUX) -L$(CARES_LIB_LINUX) $(CARES_FLAGS_LINUX) -L$(ZLIB_LIB_LINUX) $(ZLIB_FLAGS_LINUX) -lpthread -lstdc++ -lm -L$(HDF5_LIB_LINUX) $(HDF5_FLAGS_LINUX) -L$(VBZ_LIB_LINUX) $(VBZ_FLAGS_LINUX)
 	
 thread.o: thread.cpp thread.h
 	$(NVCC) -Xcompiler -fPIC -I. -DHAVE_STRUCT_TIMESPEC thread.cpp -c
