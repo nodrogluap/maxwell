@@ -1,39 +1,27 @@
-# minioncapstone
-Code related to functionality built in support of the McNUGGIT (MinION Capstone) Project 2017-19
+# Magenta & Maxwell: fast signal-level matching for direct RNA nanopore sequencing
+Magenta is novel GPU code for very fast Dynamic Time Warp (DTW) matching of a query signal (e.g. a nanopore direct RNA raw signal) against a much larger reference signal database (e.g. a reference human transcriptome).
+
+Maxwell is a standalone executable that wraps the Magenta code and the MinKNOW API in C++ to perform real time signal-level streaming DTW alignment of Oxford Nanopore Technologies (ONT) device data, so that include or exclude sequencing criteria can be applied to the biological sample using the ONT Read-Until capability. Existing approaches using the ONT Read-Until capability for DNA nanopore signal include [ReadFish](https://github.com/LooseLab/readfish) and [UNCALLED](https://github.com/skovaka/UNCALLED). Maxwell is intended for the trickier task of accurately match the noisier direct RNA signal. 
 
 ## Overview
 
-This project code consists of six major parts:
 
-1. Code to calculate by GPU the Dynamic Time Warp (smallest distance between two discretely samples series of continuous values) of reference DNA and MinION output, both measured in picoAmps.
-This calculation is approximate but suitable for the high entropy signal by partitioning the data stream into blocks (e.g. 16 picoAmp samples), Z-normalizing the query, and
-calculating the random likelihood that co-linearity exists in the best matches of many co-linear blocks.  This is our golden standard of matching to which #2 should aspire in order to quickly
-(<0.01s) match for filtering purposes (sending yea/nea to continue sequencing in a pore via the ONT Read-Until API).
-2. Code to index reference sequences and match real data to them (CPU only) using matching of Discrete Cosine Transform (DCT) derived hash codes in co-linear blocks between query and reference
-3. Empirically derived hash code matching frequency matrices to allow inexact matching of query and reference DCTs, and the scripts used to derive those matrices
-4. A queue/prioritization system for data coming from the Read-Until API so that data taking too long to process is dropped (the older the data, the less valuable for accept/reject decisions).
-5. A GUI (Web-based) to set the parameters for a MinION run's filtering (reference sequence, acceptable False Positive rate for negative selection or acceptable False Negative rate for positive filtering, % of sequences to apply the filter to)
-6. A client that connects to the MinKNOW server. This client will receive reads from the MinKNOW device and the pass them to the DTW algorithm.
+## Quick Start
 
-## Repository Status
-The status of the following parts of the projects (as listed above) are as follows:
+Download the standalone executable for Linux or Windows from the Releases.
 
-|      Contents         |    Status (Windows)   |     Status (Linux)    |
-| :-------------------: | :-------------------: | :-------------------: |
-|    DTW calculations   | Complete/ In Progress | Complete/ In Progress |
-|        Indexing       |       In Progress     |       In Progress     |
-|   Hash Code Matching  |       In Progress     |       In Progress     |
-|    Read-Until Queue   |       Incomplete      |       Incomplete      |
-|           GUI         |       Incomplete      |       Incomplete      |
-|   Read-Until Client   |       In Progress     |       In Progress     |
+Replay an existing bulk fast5 file.
 
-## Dependencies (Linux)
+Start Maxwell.
+
+
+## Compilation Dependencies (Linux)
 This repository requires that you have the following installed to compile properly:
 - [Boost C++ Libraries](https://www.boost.org/)
 - [CUDA Development Tools](https://developer.nvidia.com/cuda-toolkit) are required to use nvcc
 - All Linux dependencies for building gRPC as listed [here](grpc/INSTALL.md)
 
-## Dependencies (Windows)
+## Compilation Dependencies (Windows)
 This repository requires that you have the following installed to compile properly:
 - [Boost C++ Libraries](https://www.boost.org/)
     - Windows currently uses version 1.70.0 of boost
@@ -47,23 +35,23 @@ This repository requires that you have the following installed to compile proper
      - [MinGW](http://www.mingw.org/)
 - All Windows dependencies for building gRPC with CMake as listed [here](grpc/INSTALL.md)
 
-Ensure that your path has been updated appropriately following the installation of all above dependencies
+Ensure that your path variables have been updated appropriately following the installation of all above dependencies.
 
 ## Building (Linux)
 To build the grpc libraries, run the following script:
 ```
 $ ./all_build.sh
 ```
-**Note**: all_build.sh will automatically build the grpc libraries in minioncapstone/bin. If you want to specify a different path, you can pass that as an argument like so:
+**Note**: all_build.sh will automatically build the grpc libraries in maxwell/bin. If you want to specify a different path, you can pass that as an argument like so:
 ```
 $ ./all_build.sh /full/path/to/library/install/
 ```
 Be sure to add the lib directory found in bin to your LD_LIBRARY_PATH after running:
 ```
-/Directory/path/to/minioncapstone/bin/lib/
+/Directory/path/to/maxwell/bin/lib/
 ```
 
-Make the various search, index and client executables:
+Make the various search, index and client executables that comprise Maxwell:
 ```
 $ make all_linux
 ```
@@ -71,19 +59,19 @@ $ make all_linux
 ## Building (Windows)
 Build grpc libraries:
 ```
-C:\Directory\path\to\minioncapstone> build_all.bat
+C:\Directory\path\to\maxwell> build_all.bat
 ```
 Make the search, index and client executables:
 ```
-C:\Directory\path\to\minioncapstone> make all_windows
+C:\Directory\path\to\maxwell> make all_windows
 ```
 Add the lib directory to your PATH:
 ```
-C:\Directory\path\to\minioncapstone\lib
+C:\Directory\path\to\maxwell\lib
 ```
 
-## ont_simple_client
-Receives and prints reads received from the MinKNOW server. Performs matching against a reference genome (reference genome can be a pre indexed file or a FastA file that will be indexed upon running ont_simple_client. Additionally, the FastA file can be prefixed). CURRENTLY MATCHING DOES NOT WORK. The options for running ont_simple_client are as follows:
+## Maxwell
+Receives reads from the MinKNOW server. Performs matching against a reference genome (reference genome can be a pre indexed file or a FastA file that will be indexed upon running maxwell. Additionally, the FastA file can be prefixed). The options for running maxwell are as follows:
 
 Options for reading BED file:
 - -B (Read in BED file to compare matches to. Must provide file path with this option)
@@ -125,28 +113,28 @@ Additional options are:
 - -v (Verbose mode)
 - -h (Help message which displays all information above)
 
-### Running ont_simple_client (Linux)
+### Running maxwell (Linux)
 #### Step 1. Run MinKNOW and start up a run
 - The run can either be a real run or one sent through the playback script
 
-#### 2. Run ont_simple_client.exe
+#### Step 2. Run Maxwell with a locally attached MinION device
 
 Example:
 ```
-$ ./ont_simple_client -s 20 -e 120 -v
+$ ./maxwell -s 20 -e 120 -v
 ```
 
 Note: Reads will be obtained from the start channel to the end channel. End channel must not be smaller than start channel
 
-#### 2a. Run ont_simple_client.exe when obtaining reads from a server
-ont_simple_client can also connect to a specified host and port if you wish to obtain reads from a MinKNOW that's running elsewhere (not connected to your current machine). This is done with the -H and -P flags (for host and port, respectively)
+#### 2a. Run Maxwell when obtaining reads from a server
+Maxwell can also connect to a specified host and port if you wish to obtain reads from a MinKNOW that's running elsewhere (not connected to your current machine). This is done with the -H and -P flags (for host and port, respectively).
 
 Example:
 ```
-$ ./ont_simple_client -H 987.654.321.000 -P 4321
+$ ./maxwell -H 127.154.121.000 -P 4321
 ```
 
-### Running ont_simple_client.exe (Windows)
+### Running maxwell.exe (Windows)
 #### Step 1. Run MinKNOW and start up a run
 - The run can either be a real run or one sent through the playback script
 - Skip to step 2 if playback script is not needed
@@ -158,24 +146,24 @@ C:\Directory\path> "C:\Program Files\OxfordNanopore\MinKNOW\ont-python\python.ex
 ```
 Note: Playback script **must** be run with Oxford Nanopores own python executable
 
-#### 2. Run ont_simple_client.exe
+#### 2. Run maxwell.exe
 
 Example:
 ```
-C:\Directory\path\to\minioncapstone> ont_simple_client.exe -s 100 -e 200 -v
+C:\Directory\path\to\maxwell> maxwell.exe -s 100 -e 200 -v
 ```
 
 Note: Reads will be obtained from the start channel to the end channel. End channel must not be smaller than start channel
 
-#### 2a. Run ont_simple_client.exe when obtaining reads from a server
-ont_simple_client can also connect to a specified host and port if you wish to obtain reads from a MinKNOW that's running elsewhere (not connected to your current machine). This is done with the -H and -P flags (for host and port, respectively)
+#### 2a. Run Maxwell when obtaining reads from a server
+Maxwell can also connect to a specified host and port if you wish to obtain reads from a MinKNOW that's running elsewhere (not connected to your current machine). This is done with the -H and -P flags (for host and port, respectively)
 
 Example:
 ```
-C:\Directory\path\to\minioncapstone> ont_simple_client.exe -H 123.456.789.000 -P 1234
+C:\Directory\path\to\maxwell> maxwell.exe -H 123.456.789.000 -P 1234
 ```
 
-## check_bulk_data
+## check_bulk_data (utility)
 Reads a Bulk Fast5 file and prints the data specified.
 
 check_bulk_data takes the following arguments:
@@ -194,12 +182,12 @@ The above example will return 1500 reads starting at position 601090 from channe
 ### Running check_bulk_data.exe (Windows)
 Example:
 ```
-C:\Directory\path\to\minioncapstone> check_bulk_data.exe C:\Directory\path\to\bulk.fast5 100 512000 1200
+C:\Directory\path\to\maxwell> check_bulk_data.exe C:\Directory\path\to\bulk.fast5 100 512000 1200
 ```
 The above example will return 1200 reads starting at position 512000 from channel 100
 
-## magenta_short_index
-Indexes either a FastA, directory of Fast5 files, or a Bulk Fast5 file and writes the output to a set of files. These files are reference genomes that will be used for the matching in magenta and ont_simple_client. Data in files generated can either be in floats or shorts. Options for magenta_short_index are as follows:
+## magenta_index
+Indexes either a FastA, directory of Fast5 files, or a Bulk Fast5 file and writes the output to a set of files. These files are reference genomes that will be used for the matching in Magenta and Maxwell. Data in files generated can either be in floats or shorts. Options for maxwell_index are as follows:
 
 Options for selecting index input file type are (must run with **one** of the following):
 - -a (Index a bulk FastA file)
@@ -221,7 +209,7 @@ Additional options are:
 - -v (Verbose mode)
 - -h (Help message which displays all information above)
 
-### Running magenta_short_index (Linux)
+### Running maxwell_index (Linux)
 An output path filename is taken as an argument. Given an output path of /Directory/path/to/output the following files will be created:
 - /Directory/path/to/output.txt - Contains the indexed values
 - /Directory/path/to/output.hpr - Contains the raw half point values
@@ -229,25 +217,25 @@ An output path filename is taken as an argument. Given an output path of /Direct
 
 Example 1 - Indexing a FastA file:
 ```
-$ ./magenta_short_index -a -v /Directory/path/to/reference_nucleotides.fasta /Directory/path/to/output
+$ ./magenta_index -a -v /Directory/path/to/reference_nucleotides.fasta /Directory/path/to/output
 ```
 
 The above example will index the FastA file in verbose mode.
 
 Example 2 - Indexing a Bulk Fast5 file:
 ```
-$ ./magenta_short_index -l -u /Directory/path/to/bulk_file.fast5 /Directory/path/to/output
+$ ./magenta_index -l -u /Directory/path/to/bulk_file.fast5 /Directory/path/to/output
 ```
 
 The above example will index the Bulk Fast5 file using raw data that will be written as shorts
 
 Example 3 - Indexing a Directory of Fast5 Files:
 ```
-$ ./magenta_short_index -f /Directory/path/to/Fast5/files/ /Directory/path/to/output
+$ ./magenta_index -f /Directory/path/to/Fast5/files/ /Directory/path/to/output
 ```
 The above example will index the directory of Fast5 files using non-raw data since the -u flag was not provided. Data will be written as floats
 
-### Running magenta_short_index.exe (Windows)
+### Running magenta_index.exe (Windows)
 An output path filename is taken as an argument. Given an output path of C:\Directory\path\to\output the following files will be created:
 - C:\Directory\path\to\output.txt - Contains the indexed values
 - C:\Directory\path\to\output.hpr - Contains the raw half point values
@@ -256,29 +244,29 @@ An output path filename is taken as an argument. Given an output path of C:\Dire
 
 Example 1 - Indexing a FastA file:
 ```
-C:\Directory\path\to\minioncapstone> magenta_short_index.exe -a -v -s C:\Directory\path\to\reference_nucleotides.fasta C:\Directory\path\to\output
+C:\Directory\path\to\maxwell> magenta_index.exe -a -v -s C:\Directory\path\to\reference_nucleotides.fasta C:\Directory\path\to\output
 ```
 
 The above example will index the FastA file in verbose mode single stranded.
 
 Example 2 - Indexing a Bulk Fast5 file:
 ```
-C:\Directory\path\to\minioncapstone> magenta_short_index.exe -l -u C:\Directory\path\to\bulk_file.fast5 C:\Directory\path\to\output
+C:\Directory\path\to\maxwell> magenta_index.exe -l -u C:\Directory\path\to\bulk_file.fast5 C:\Directory\path\to\output
 ```
 
 The above example will index the Bulk Fast5 file using raw data that will be written as shorts
 
 Example 3 - Indexing a Directory of Fast5 Files:
 ```
-C:\Directory\path\to\minioncapstone> magenta_short_index.exe -f C:\Directory\path\to\Fast5\files\ C:\Directory\path\to\output
+C:\Directory\path\to\maxwell> magenta_index.exe -f C:\Directory\path\to\Fast5\files\ C:\Directory\path\to\output
 ```
 The above example will index the directory of Fast5 files using non-raw data since the -u flag was not provided. Data will be written as floats
 
-## magenta
-Receives a FastA, directory of Fast5, or Bulk5 file and compares it to either a reference file generated by magenta_short_index or a FastA, directory of Fast5, or Bulk5 file. Any match that is found (based on the false discovery rate that can be set by the user) is written to an output file. **CURRENTLY DOES NOT WORK ON EITHER OS**
+## Magenta
+Takes a FastA, directory of Fast5, or Bulk5 file and compares it to either a reference file generated by magenta_index or a FastA, directory of Fast5, or Bulk5 file. Any match that is found (based on the false discovery rate that can be set by the user) is written to an output file. 
 
-magenta is run with the following arguments:
-- The indexed reference file built by magenta_short_index (Without the extensions as magenta uses the different output files that magenta_short_index made), OR
+Magenta is run with the following arguments:
+- The indexed reference file built by magenta_index (Without the extensions as magenta uses the different output files that magenta_short_index made), OR
 - A FastA, directory of Fast5, or Bulk5 file as a reference
 - The path that magenta will write output containing the matches to
 - A FastA, directory of Fast5, or Bulk5 file to compare to the reference file provided above
@@ -320,7 +308,6 @@ Additional options are:
 - -h (Help message which displays all information above)
 
 ### Running magenta (Linux)
-Coming soon (In development)
 
 Example:
 ```
@@ -329,11 +316,11 @@ $ ./magenta -v -B /Directory/path/to/file.bed -E -i /Directory/path/to/file.fast
 
 The above example will compare the query of Fast5 files against the file.fasta reference and check for any overlaps with intervals read in from the BED file file.bed
 
-### Running magenta.exe (Windows)
+### Running maxwell.exe (Windows)
 
 Example:
 ```
-C:\Directory\path\to\minioncapstone> magenta.exe -p 0.05 -w 0.5 -I C:\Directory\path\to\indexed_reference C:\Directory\path\to\output C:\Directory\path\to\reference_nucleotides.fasta
+C:\Directory\path\to\maxwell> magenta.exe -p 0.05 -w 0.5 -I C:\Directory\path\to\indexed_reference C:\Directory\path\to\output C:\Directory\path\to\reference_nucleotides.fasta
 ```
 The above example will compare the query reference_nucleotides.fasta file against the indexed_reference with a false discovery rate of 0.05 and a warp of 0.5
 
@@ -367,27 +354,24 @@ Confirm that all tests run properly with no errors.
 Move into the tests\ directory
 
 ```
-C:\Directory\path\to\minioncapstone> cd tests\
+C:\Directory\path\to\maxwell> cd tests
 ```
 
 Make magenta_utils_tests
 
 ```
-C:\Directory\path\to\minioncapstone\tests> make magenta_utils_tests.exe
+C:\Directory\path\to\maxwell\tests> make magenta_utils_tests.exe
 ```
 
 Run magenta_utils_tests
 
 ```
-C:\Directory\path\to\minioncapstone\tests> magenta_utils_tests.exe
+C:\Directory\path\to\maxwell\tests> magenta_utils_tests.exe
 ```
 
 Confirm that all tests run properly with no errors.
 
 ## Related
-Slack: https://minioncapstone.slack.com (commits are notified here too, you can use screen share, whiteboard, other cool stuff)
-
-Confluence: https://minioncapstone.atlassian.net (collaborative planning and documentation)
 
 gRPC: https://github.com/grpc/grpc
 
