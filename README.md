@@ -45,25 +45,13 @@ This repository requires that you have the following installed to compile proper
 Ensure that your path variables have been updated appropriately following the installation of all above dependencies.
 
 ## Building (Linux)
-To build the grpc libraries, run the following script:
+
+Make the client executable:
 ```
-$ ./all_build.sh
-```
-**Note**: all_build.sh will automatically build the grpc libraries in maxwell/bin. If you want to specify a different path, you can pass that as an argument like so:
-```
-$ ./all_build.sh /full/path/to/library/install/
-```
-Be sure to add the lib directory found in bin to your LD_LIBRARY_PATH after running:
-```
-/Directory/path/to/maxwell/bin/lib/
+$ make maxwell
 ```
 
-Make the various search, index and client executables that comprise Maxwell:
-```
-$ make all_linux
-```
-
-## Building (Windows)
+## Building (Windows) **not yet fully tested**
 Build grpc libraries:
 ```
 C:\Directory\path\to\maxwell> build_all.bat
@@ -131,9 +119,9 @@ Example:
 $ ./maxwell -s 20 -e 120 -v
 ```
 
-Note: Reads will be obtained from the start channel to the end channel. End channel must not be smaller than start channel
+Note: Reads will be processed from the start channel (20) to the end channel (120). End channel must not be smaller than start channel
 
-#### 2a. Run Maxwell when obtaining reads from a server
+#### 2a. Run Maxwell when obtaining reads from a remote server
 Maxwell can also connect to a specified host and port if you wish to obtain reads from a MinKNOW that's running elsewhere (not connected to your current machine). This is done with the -H and -P flags (for host and port, respectively).
 
 Example:
