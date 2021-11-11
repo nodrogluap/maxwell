@@ -8,12 +8,13 @@ Maxwell is a standalone executable that wraps the Magenta code and the MinKNOW A
 
 ## Quick Start
 
-Download the standalone executable for Linux or Windows from the Releases.
+1. Download the standalone executable for Linux or Windows from the Releases.
 
-Replay an existing bulk fast5 file.
+2. Replay an existing bulk fast5 file. On Windows:
+C:\Directory\path> "C:\Program Files\OxfordNanopore\MinKNOW\ont-python\python.exe" "C:\Program Files\OxfordNanopore\MinKNOW\python\recipes\playback.py" --source <bulk/fast5/file/path.fast5>
 
-Start Maxwell.
-
+3. Start Maxwell with a false discovery rate of 0.05 for some set of known sequences you do NOT want to resequence.
+maxwell.exe -p 0.05 -I <exclusion_sequences.fasta>
 
 ## Getting the source code
 Maxwell depends on a number of external libraries, which are compiled from source to build a standalone executable. When cloning this repository, be sure to include all the submodules like so:
