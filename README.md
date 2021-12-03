@@ -8,12 +8,13 @@ Maxwell is a standalone executable that wraps the Magenta code and the MinKNOW A
 
 ## Quick Start
 
-Download the standalone executable for Linux or Windows from the Releases.
+1. Download the standalone executable for Linux or Windows from the Releases.
 
-Replay an existing bulk fast5 file.
+2. Replay an existing bulk fast5 file. On Windows:
+C:\Directory\path> "C:\Program Files\OxfordNanopore\MinKNOW\ont-python\python.exe" "C:\Program Files\OxfordNanopore\MinKNOW\python\recipes\playback.py" --source <bulk/fast5/file/path.fast5>
 
-Start Maxwell.
-
+3. Start Maxwell with a false discovery rate of 0.05 for some set of known sequences you do NOT want to resequence.
+maxwell.exe -p 0.05 -I <exclusion_sequences.fasta>
 
 ## Getting the source code
 Maxwell depends on a number of external libraries, which are compiled from source to build a standalone executable. When cloning this repository, be sure to include all the submodules like so:
@@ -45,25 +46,13 @@ This repository requires that you have the following installed to compile proper
 Ensure that your path variables have been updated appropriately following the installation of all above dependencies.
 
 ## Building (Linux)
-To build the grpc libraries, run the following script:
+
+Make the client executable:
 ```
-$ ./all_build.sh
-```
-**Note**: all_build.sh will automatically build the grpc libraries in maxwell/bin. If you want to specify a different path, you can pass that as an argument like so:
-```
-$ ./all_build.sh /full/path/to/library/install/
-```
-Be sure to add the lib directory found in bin to your LD_LIBRARY_PATH after running:
-```
-/Directory/path/to/maxwell/bin/lib/
+$ make maxwell
 ```
 
-Make the various search, index and client executables that comprise Maxwell:
-```
-$ make all_linux
-```
-
-## Building (Windows)
+## Building (Windows) **not yet fully tested**
 Build grpc libraries:
 ```
 C:\Directory\path\to\maxwell> build_all.bat
@@ -131,9 +120,9 @@ Example:
 $ ./maxwell -s 20 -e 120 -v
 ```
 
-Note: Reads will be obtained from the start channel to the end channel. End channel must not be smaller than start channel
+Note: Reads will be processed from the start channel (20) to the end channel (120). End channel must not be smaller than start channel
 
-#### 2a. Run Maxwell when obtaining reads from a server
+#### 2a. Run Maxwell when obtaining reads from a remote server
 Maxwell can also connect to a specified host and port if you wish to obtain reads from a MinKNOW that's running elsewhere (not connected to your current machine). This is done with the -H and -P flags (for host and port, respectively).
 
 Example:
