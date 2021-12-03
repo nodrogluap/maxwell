@@ -2,6 +2,7 @@
 #define __dba_cuda_utils_included
 
 #include "ont_utils.cuh"
+#include "all_utils.hpp"
 
 #define CUDA_THREADBLOCK_MAX_L1CACHE 48000
 // Note that you should not change this to >1028 unless you carefully review all the code for reduction steps that imply 32x32 map-reduce!
@@ -18,7 +19,9 @@
 
 #define DIV_ROUNDUP(numerator, denominator) (((numerator) + (denominator) - 1)/(denominator))
 
-// Find the smallest value for a local variable within a warp 
+// Finds the minimum value in a warp (here of 32) and returns the result
+// val - the values in the warp that will be compared with one another
+// returns the value found to be the minimum in the warp
 template<typename T>
 __inline__ __device__ T warpReduceMin(T val){
     for (int offset = CUDA_WARP_WIDTH/2; offset > 0; offset /= 2){
@@ -69,7 +72,7 @@ int
 read_text_data(const char *text_file_name, T **output_vals, size_t *num_output_vals){
 
 	// Count the number of lines in the file (buffering 1MB on read for speed) so we know how much space to allocate for output_vals
-	std::ios::sync_with_stdio(false); //optimization
+	// std::ios::sync_with_stdio(false); //optimization
 	const int SZ = 1024 * 1024;
 	std::vector <char> read_buffer( SZ );
 	std::ifstream ifs(text_file_name); 
@@ -120,28 +123,29 @@ read_text_data(const char *text_file_name, T **output_vals, size_t *num_output_v
 template <typename T>
 int
 read_fast5_data(const char *fast5_file_name, T **sequences, char **sequence_names, size_t *sequence_lengths){
+	
 	int local_seq_count_so_far = 0;
 
-	hid_t file_id = H5Fopen(fast5_file_name, H5F_ACC_RDONLY, H5P_DEFAULT);
-	if(file_id < 0){ // No message, assume scan function called earlier provided these
-		return 0;
-	}
+        hid_t file_id = H5Fopen(fast5_file_name, H5F_ACC_RDONLY, H5P_DEFAULT);
+        if(file_id < 0){ // No message, assume scan function called earlier provided these
+                return 0;
+        }
 	bool old_format = true;
-	H5Eset_auto1(NULL, NULL);
-	// Old format, one read per file
+        H5Eset_auto1(NULL, NULL);
+        // Old format, one read per file
 	hid_t read_group = H5Gopen(file_id, "/Raw/Reads", H5P_DEFAULT);
 	if(read_group < 0){ // New formst, multiple reads per file
 		read_group = H5Gopen(file_id, "/", H5P_DEFAULT);
 		old_format = false;
-	}
+        }
 	hsize_t num_read_objects = 0;
-	if(read_group < 0 || H5Gget_num_objs(read_group, &num_read_objects)){
-		H5Fclose(file_id);
-		H5Gclose(read_group);
-		return 0;
-	}
-	char *read_subgroup_name = NULL;
-	for(int i = 0; i < num_read_objects; ++i){
+        if(read_group < 0 || H5Gget_num_objs(read_group, &num_read_objects)){
+                H5Gclose(read_group);
+                H5Fclose(file_id);
+                return 0;
+        }
+       	char *read_subgroup_name = NULL;
+        for(int i = 0; i < num_read_objects; ++i){
 		ssize_t name_size = H5Gget_objname_by_idx(read_group, i, NULL, 0);
 		if(name_size < 5){
 			continue; // Too short to be "[Rr]ead_..."
@@ -155,12 +159,11 @@ read_fast5_data(const char *fast5_file_name, T **sequences, char **sequence_name
 			exit(FAST5_CANNOT_MALLOC_READNAME);
 		}
 		name_size = H5Gget_objname_by_idx(read_group, i, read_subgroup_name, name_size);
-		name_size++; // add space for NULL termination
 		// Should have the form Read_# (old) or read_????? (new)
-		if(name_size < 5 || (read_subgroup_name[0] != 'R' && read_subgroup_name[0] != 'r') || read_subgroup_name[1] != 'e' || read_subgroup_name[2] != 'a' || read_subgroup_name[3] != 'd' || read_subgroup_name[4] != '_'){
+                if(name_size < 5 || (read_subgroup_name[0] != 'R' && read_subgroup_name[0] != 'r') || read_subgroup_name[1] != 'e' || read_subgroup_name[2] != 'a' || read_subgroup_name[3] != 'd' || read_subgroup_name[4] != '_'){
 			std::cerr << "Skipping " << read_subgroup_name << " as it does not follow the naming convention" << std::endl;
-			continue;
-		}
+                        continue;
+                }
 		hid_t signal_dataset_id = 0;
 		if(old_format){
 			signal_dataset_id = H5Dopen(file_id, (CONCAT3("/Raw/Reads/",read_subgroup_name,"/Signal")).c_str(), H5P_DEFAULT);
@@ -170,16 +173,16 @@ read_fast5_data(const char *fast5_file_name, T **sequences, char **sequence_name
 		}
 		if(signal_dataset_id < 0){
 			std::cerr << "Skipping " << read_subgroup_name << " Signal, H5DOpen failed" << std::endl;
-			continue;
+                        continue;
 		}
 		hid_t signal_dataspace_id = H5Dget_space(signal_dataset_id);
 		if(signal_dataspace_id < 0){
 			std::cerr << "Skipping " << read_subgroup_name << " Signal, cannot get the data space" << std::endl;
-			continue;
+                        continue;
 		}
 		const hsize_t read_length = H5Sget_simple_extent_npoints(signal_dataspace_id);
 		if(read_length < 1){
-			std::cerr << "Skipping " << read_subgroup_name << " with reported Signal length " <<	read_length << std::endl;
+			std::cerr << "Skipping " << read_subgroup_name << " with reported Signal length " <<  read_length << std::endl;
 			continue;
 		}
 		hid_t memSpace = H5Screate_simple(1, &read_length, NULL);
@@ -190,26 +193,28 @@ read_fast5_data(const char *fast5_file_name, T **sequences, char **sequence_name
 		short *sequence_buffer = (short *) std::malloc(sizeof(short)*read_length);
 		if(H5Dread(signal_dataset_id, H5T_STD_I16LE, memSpace, signal_dataspace_id, H5P_DEFAULT, sequence_buffer) < 0){
 			std::cerr << "Skipping " << read_subgroup_name << ", could not get " << read_length << " Signal from bulk FAST5 (HDF5) file '" << fast5_file_name << "'" << std::endl;
+			exit(5);
 			continue;
 		}
-		
+		T *t_seq = 0;
+		cudaMallocManaged(&t_seq, sizeof(T)*read_length);  CUERR("Cannot allocate CPU memory for FAST5 signal");
 		// Convert the FAST5 raw shorts to the desired datatype from the template
-		T *t_seq = cuda_shortToTemplate<T>(sequence_buffer, read_length);
-		// cudaMallocHost(&t_seq, sizeof(T)*read_length);	CUERR("Cannot allocate CPU memory for FAST5 signal");
-		
-		// for(int j = 0; j < read_length; j++){
-			// t_seq[j] = (T) sequence_buffer[j];
-		// }
+		for(int j = 0; j < read_length; j++){
+			t_seq[j] = (T) sequence_buffer[j];
+		}
 		free(sequence_buffer);
 		sequences[i] = t_seq;
 		sequence_lengths[i] = read_length;
 		cudaMallocHost(&sequence_names[local_seq_count_so_far], name_size); CUERR("Cannot allocate CPU memory for reading sequence name from FAST5 file");
-		memcpy(sequence_names[local_seq_count_so_far], read_subgroup_name, name_size);
+                memcpy(sequence_names[local_seq_count_so_far], read_subgroup_name, name_size);
 
 		H5Dclose(signal_dataset_id);
 		local_seq_count_so_far++;
 	}
 	if(read_subgroup_name != NULL) free(read_subgroup_name);
+	H5Gclose(read_group);
+	H5Fclose(file_id);
+
 	return local_seq_count_so_far;
 }
 
@@ -371,7 +376,11 @@ read_binary_data(const char *binary_file_name, T **output_vals, size_t *num_outp
 
 	ifs.seekg(0, std::ios::beg);
 	ifs.read((char *) out, n);
-
+	
+	for(int i = 0; i < n/sizeof(T); i++){
+		std::cerr << out[i] << ", ";
+	}
+	std::cerr << std::endl;
 	// Only set the output if all the data was succesfully read in.
 	*output_vals = out;
 	return 1;

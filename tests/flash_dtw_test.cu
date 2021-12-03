@@ -24,10 +24,10 @@
 #endif
 
 #include "../cuda_utils.h" // CUERR() and timer functions
-#include "../flash_utils.hpp" // Needed for reading in binary data
+#include "../cuda_utils.hpp" // Needed for reading in binary data
 
-#define QTYPE_float
-#define QTYPE_ACC_float
+#define QTYPE_double
+#define QTYPE_ACC_double
 
 #ifndef MINIDTW_STRIDE
 #define MINIDTW_STRIDE 1
@@ -47,7 +47,7 @@ TEST_CASE( " Get Znorm Stats " ){
 
 	std::string good_file = current_working_dir + "/good_files/binary/coxsackie_a16_3prime.fna.bin0";
 	QTYPE *good_subject_values;
-	unsigned long long int num_subject_values;
+	size_t num_subject_values;
 	int result = read_binary_data<QTYPE>(good_file.c_str(), &good_subject_values, &num_subject_values);
 
 	float *mean;
@@ -67,7 +67,7 @@ TEST_CASE( " Get Znorm Stats " ){
 		// for(int i = 0; i < num_subject_values; i++){
 			// std::cerr << good_subject_values[i] << ", ";
 		// }
-		// std::cerr << std::endl;
+		std::cerr << std::endl;
 
 		QTYPE *data;
 		cudaMalloc(&data, sizeof(QTYPE)*num_subject_values);		CUERR("Allocating data");
@@ -107,7 +107,7 @@ TEST_CASE( " Load Subject " ) {
 
 	std::string good_file = current_working_dir + "/good_files/binary/coxsackie_a16_3prime.fna.bin0";
 	QTYPE *good_subject_values;
-	unsigned long long int num_subject_values;
+	size_t num_subject_values;
 	int result = read_binary_data<QTYPE>(good_file.c_str(), &good_subject_values, &num_subject_values);
 
 	SECTION("Good Subject No STD"){
@@ -143,7 +143,7 @@ TEST_CASE( " Mean Min Max Kernel " ){
 
 	std::string good_file = current_working_dir + "/good_files/binary/coxsackie_a16_3prime.fna.bin0";
 	QTYPE *good_subject_values;
-	unsigned long long int num_subject_values;
+	size_t num_subject_values;
 	int result = read_binary_data<QTYPE>(good_file.c_str(), &good_subject_values, &num_subject_values);
 
 	SECTION("Good data"){
@@ -333,7 +333,7 @@ TEST_CASE(" Hard DTW "){
 		std::string good_file_sub = current_working_dir + "/good_files/text/good_test_sub.txt";
 		std::string good_file_query = current_working_dir + "/good_files/text/good_test_query.txt";
 		QTYPE *good_subject_values;
-		unsigned long long int num_subject_values;
+		size_t num_subject_values;
 		int result_test = read_text_data<QTYPE>(good_file_sub.c_str(), &good_subject_values, &num_subject_values);
 
 		// std::cerr << "Subject: ";
@@ -343,7 +343,7 @@ TEST_CASE(" Hard DTW "){
 		// std::cerr << std::endl << std::endl;
 
 		QTYPE *good_query_values;
-		unsigned long long int num_query_values;
+		size_t num_query_values;
 		int result = read_text_data<QTYPE>(good_file_query.c_str(), &good_query_values, &num_query_values);
 
 		// std::cerr << "Query: ";
@@ -404,13 +404,13 @@ TEST_CASE(" Hard DTW "){
 		std::string good_file_sub = current_working_dir + "/good_files/text/dtw_l2_norm_subject.txt";
 		std::string good_file_query = current_working_dir + "/good_files/text/dtw_l2_norm_query.txt";
 		QTYPE *good_subject_values;
-		unsigned long long int num_subject_values;
+		size_t num_subject_values;
 		int result_test = read_text_data<QTYPE>(good_file_sub.c_str(), &good_subject_values, &num_subject_values);
 
 		REQUIRE( num_subject_values == 10 );
 
 		QTYPE *good_query_values;
-		unsigned long long int num_query_values;
+		size_t num_query_values;
 		int result = read_text_data<QTYPE>(good_file_query.c_str(), &good_query_values, &num_query_values);
 
 		REQUIRE( num_query_values == 10 );
@@ -473,13 +473,13 @@ TEST_CASE(" Soft DTW "){
 		std::string good_file_sub = current_working_dir + "/good_files/text/dtw_l2_norm_subject.txt";
 		std::string good_file_query = current_working_dir + "/good_files/text/dtw_l2_norm_query.txt";
 		QTYPE *good_subject_values;
-		unsigned long long int num_subject_values;
+		size_t num_subject_values;
 		int result_test = read_text_data<QTYPE>(good_file_sub.c_str(), &good_subject_values, &num_subject_values);
 
 		REQUIRE( num_subject_values == 10 );
 
 		QTYPE *good_query_values;
-		unsigned long long int num_query_values;
+		size_t num_query_values;
 		int result = read_text_data<QTYPE>(good_file_query.c_str(), &good_query_values, &num_query_values);
 
 		REQUIRE( num_query_values == 10 );
@@ -714,11 +714,17 @@ TEST_CASE("Sorted NonColinear Distances"){
 		set_mem[i] = i % 2 == 0 ? 0 : -1;
 	}		
 		
-	// std::cerr << "Distances: ";
-	// for(int i = 0; i < dtw_dist_size; i++){
-		// std::cerr << dtw_dists[i] << ", ";
-	// }
-	// std::cerr << std::endl;
+	std::cerr << "Distances: ";
+	for(int i = 0; i < dtw_dist_size; i++){
+		std::cerr << dtw_dists[i] << ", ";
+	}
+	std::cerr << std::endl;
+	
+	std::cerr << "Mem: ";
+	for(int i = 0; i < num_candidate_query_indices; i++){
+		std::cerr << set_mem[i] << ", ";
+	}
+	std::cerr << std::endl;
 
 	short* membership;
 	cudaMalloc(&membership, sizeof(short)*num_candidate_query_indices);			CUERR("Allocating membership");
@@ -732,6 +738,8 @@ TEST_CASE("Sorted NonColinear Distances"){
 	int num_non_dists = 0;
 	cudaMalloc(&total_num_sorted_non_colinear_distances, sizeof(int));	CUERR("Allocating total_num_sorted_non_colinear_distances");
 	cudaMemcpy(total_num_sorted_non_colinear_distances, &num_non_dists, sizeof(int), cudaMemcpyHostToDevice); 		CUERR("Copying total_num_sorted_non_colinear_distances from host to device");
+	
+	dim3 pval_griddim(num_candidate_subject_indices, 1, 1); // really big queries may get split, also round up as per usual
 
 	SECTION("Good Data With Equal Colinear and Non Colinear Distances"){
 
@@ -744,7 +752,6 @@ TEST_CASE("Sorted NonColinear Distances"){
 		cudaMalloc(&sorted_non_colinear_distances, sizeof(QTYPE_ACC)*num_sorted_non_colinear_distances);			CUERR("Allocating sorted non col dists");
 
 		int threadblock_size = int(num_candidate_query_indices);
-		dim3 pval_griddim(1, 1, 1); // really big queries may get split, also round up as per usual
 		size_t required_threadblock_shared_memory = dtw_dist_size*sizeof(QTYPE_ACC);
 
 		int *non_colinear_distance_lengths;
@@ -785,7 +792,6 @@ TEST_CASE("Sorted NonColinear Distances"){
 		cudaMalloc(&sorted_non_colinear_distances, sizeof(QTYPE_ACC)*num_sorted_non_colinear_distances);			CUERR("Allocating sorted non col dists");
 
 		int threadblock_size = int(num_candidate_query_indices);
-		dim3 pval_griddim(1, 1, 1); // really big queries may get split, also round up as per usual
 		size_t required_threadblock_shared_memory = dtw_dist_size*sizeof(QTYPE_ACC);
 
 		int *non_colinear_distance_lengths;
@@ -830,7 +836,6 @@ TEST_CASE("Sorted NonColinear Distances"){
 		cudaMalloc(&sorted_non_colinear_distances, sizeof(QTYPE_ACC)*num_sorted_non_colinear_distances);			CUERR("Allocating sorted non col dists");
 
 		int threadblock_size = int(num_candidate_query_indices);
-		dim3 pval_griddim(1, 1, 1); // really big queries may get split, also round up as per usual
 		size_t required_threadblock_shared_memory = dtw_dist_size*sizeof(QTYPE_ACC);
 
 		int *non_colinear_distance_lengths;
@@ -865,7 +870,7 @@ TEST_CASE("Sorted NonColinear Distances"){
 
 	}
 
-	SECTION("Good Data With Less Colinear and More Non Colinear Distances"){
+	SECTION("Good Data With Two Memberships"){
 
 		std::cerr << "------TEST SORTED NON COLINEAR DISTANCES TWO MEMBERSHIPS------" << std::endl;
 
@@ -874,20 +879,25 @@ TEST_CASE("Sorted NonColinear Distances"){
 		for(int i = 0; i < num_candidate_query_indices; i++){
 			set_mem_test[i] = i % 2 == 0 ? 0 : 1;
 		}		
+		
+		std::cerr << "Mem test: ";
+		for(int i = 0; i < num_candidate_query_indices; i++){
+			std::cerr << set_mem_test[i] << ", ";
+		}
+		std::cerr << std::endl;
 	
 		short* membership_test;
 		cudaMalloc(&membership_test, sizeof(short)*num_candidate_query_indices);			CUERR("Allocating membership");
 		cudaMemcpy(membership_test, set_mem_test, sizeof(short)*num_candidate_query_indices, cudaMemcpyHostToDevice); 		CUERR("Copying membership from host to device");
 
 
-		int num_sorted_colinear_distances = 256;
+		int num_sorted_colinear_distances = num_candidate_query_indices;
 
 		QTYPE_ACC *sorted_non_colinear_distances;
 		int num_sorted_non_colinear_distances = 2*num_candidate_query_indices - num_sorted_colinear_distances;
 		cudaMalloc(&sorted_non_colinear_distances, sizeof(QTYPE_ACC)*2*num_sorted_non_colinear_distances);			CUERR("Allocating sorted non col dists");
 
 		int threadblock_size = int(num_candidate_query_indices);
-		dim3 pval_griddim(1, 1, 1); // really big queries may get split, also round up as per usual
 		size_t required_threadblock_shared_memory = dtw_dist_size*sizeof(QTYPE_ACC);
 
 		int *non_colinear_distance_lengths;
@@ -898,11 +908,11 @@ TEST_CASE("Sorted NonColinear Distances"){
 		QTYPE_ACC *return_sorted_dists = (QTYPE_ACC *)malloc(sizeof(QTYPE_ACC)*2*num_sorted_non_colinear_distances);
 		cudaMemcpy(return_sorted_dists, sorted_non_colinear_distances, sizeof(QTYPE_ACC)*2*num_sorted_non_colinear_distances, cudaMemcpyDeviceToHost); 		CUERR("Copying sorted dists from device to host");
 
-		// std::cerr << "Return sorted non distances: ";
-		// for(int i = 0; i < 2*num_sorted_non_colinear_distances; i++){
-			// std::cerr << return_sorted_dists[i] << ", ";
-		// }
-		// std::cerr << std::endl;
+		std::cerr << "Return sorted non distances: ";
+		for(int i = 0; i < 2*num_sorted_non_colinear_distances; i++){
+			std::cerr << return_sorted_dists[i] << ", ";
+		}
+		std::cerr << std::endl;
 
 		REQUIRE(return_sorted_dists[0] == 1);
 		REQUIRE(return_sorted_dists[1] == 2);

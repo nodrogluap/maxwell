@@ -12,6 +12,8 @@
 #define CUDA_THREADBLOCK_MAX_THREADS 1024
 #endif
 #define CUDA_THREADBLOCK_MAX_L1CACHE 48000
+// It's actually most efficient computationally to send all the queries to the CUDA kernels en masse if you have a bunch of short ones, rather than sending them one at a time.
+// Set a cap on the number to send at once since we need to know the limit ahead of time for task parcelling. 
 #define CUDA_CONSTANT_MEMORY_SIZE 66068
 
 // Convenience macro used when calculating number of blocks required for processing a given anmount of data

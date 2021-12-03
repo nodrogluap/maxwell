@@ -128,22 +128,25 @@ __global__ void get_sorted_non_colinear_distances_kernel(QTYPE_ACC *sorted_non_c
 	if(num_members == 0){
 		return;
 	}
+	
+	printf("Thread specific %i*(%i / %i)+%i*%i*%i: %i\n", CUDA_THREADBLOCK_MAX_THREADS, threadIdx.x, num_candidate_query_indices, CUDA_THREADBLOCK_MAX_THREADS, num_candidate_query_indices, blockIdx.x, CUDA_THREADBLOCK_MAX_THREADS*(threadIdx.x%num_candidate_query_indices)+CUDA_THREADBLOCK_MAX_THREADS*num_candidate_query_indices*blockIdx.x);
 
-	if(thorough_calc){
+	// if(thorough_calc){
 		get_sorted_non_colinear_distances<T>(my_thread_specific_sorted_non_colinear_distances, membership, num_members, query_adjacent_distances, &num_sorted_non_colinear_distances, num_candidate_query_indices, num_candidate_subject_indices, thorough_calc, 0, num_sorted_colinear_distances, false);
-		// for(int j = 0; j < num_sorted_non_colinear_distances; j++){
-			// sorted_non_colinear_distances[blockIdx.x*blockDim.x+j] = my_thread_specific_sorted_non_colinear_distances[j];
-		// }
+		
+		for(int j = 0; j < num_sorted_non_colinear_distances; j++){
+			printf("sorted_non_colinear_distances[%i]: %f\n",j ,sorted_non_colinear_distances[j]);
+		}
 		(*total_num_sorted_non_colinear_distances) += num_sorted_non_colinear_distances;
 		non_colinear_distance_lengths[bid] = num_sorted_non_colinear_distances;
-	} else{
-		get_sorted_non_colinear_distances<T>(my_thread_specific_sorted_non_colinear_distances, membership, num_members, query_adjacent_distances, &num_sorted_non_colinear_distances, num_candidate_query_indices, num_candidate_subject_indices, thorough_calc, 0, num_sorted_colinear_distances, false);
-		// for(int j = 0; j < num_sorted_non_colinear_distances; j++){
-			// sorted_non_colinear_distances[blockIdx.x*blockDim.x+j] = my_thread_specific_sorted_non_colinear_distances[j];
-		// }
-		(*total_num_sorted_non_colinear_distances) += num_sorted_non_colinear_distances;
-		non_colinear_distance_lengths[bid] = num_sorted_non_colinear_distances;
-	}
+	// } else{
+		// get_sorted_non_colinear_distances<T>(my_thread_specific_sorted_non_colinear_distances, membership, num_members, query_adjacent_distances, &num_sorted_non_colinear_distances, num_candidate_query_indices, num_candidate_subject_indices, thorough_calc, 0, num_sorted_colinear_distances, false);
+		// // for(int j = 0; j < num_sorted_non_colinear_distances; j++){
+			// // sorted_non_colinear_distances[blockIdx.x*blockDim.x+j] = my_thread_specific_sorted_non_colinear_distances[j];
+		// // }
+		// (*total_num_sorted_non_colinear_distances) += num_sorted_non_colinear_distances;
+		// non_colinear_distance_lengths[bid] = num_sorted_non_colinear_distances;
+	// }
 }
 
 // Device side function that is used to call get_sorted_non_colinear_distances from flash_dtw.cuh

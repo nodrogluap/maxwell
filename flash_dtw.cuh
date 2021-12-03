@@ -57,6 +57,16 @@
 #define dtwmin(a, b) (min(a, b))
 #endif
 
+#ifdef QTYPE_double
+#define QTYPE double
+#endif
+
+#ifdef QTYPE_ACC_double
+#define QTYPE_ACC double
+#define dtwmin(a, b) (min(a, b))
+#define DTW_MAX DBL_MAX
+#endif
+
 #ifdef QTYPE_half
 #include <cuda_fp16.h>
 #define QTYPE __half
@@ -137,15 +147,15 @@ __host__ double euclidean_dtw(float *x, int nx, float *y, int ny, int xoffset, l
 #include <fstream>
 
 // For warp level CUDA ops like shuffle down
-#define FULL_MASK 0xffffffff
+// #define FULL_MASK 0xffffffff
 
-#define CUDA_WARP_WIDTH 32
+// #define CUDA_WARP_WIDTH 32
 // #if defined(_DEBUG_REG)
 // #define CUDA_THREADBLOCK_MAX_THREADS 256
 // #else
-#define CUDA_THREADBLOCK_MAX_THREADS 1024
+// #define CUDA_THREADBLOCK_MAX_THREADS 1024
 // #endif
-#define CUDA_THREADBLOCK_MAX_L1CACHE 48000
+// #define CUDA_THREADBLOCK_MAX_L1CACHE 48000
 
 #include "cuda_utils.h"
    
@@ -159,9 +169,7 @@ __host__ double euclidean_dtw(float *x, int nx, float *y, int ny, int xoffset, l
 #define LOCAL_ZNORM 1  // Each query separately
 #define NO_ZNORM 0     // Use as-is (i.e. it came in z-normalized)
 
-// It's actually most efficient computationally to send all the queries to the CUDA kernels en masse if you have a bunch of short ones, rather than sending them one at a time.
-// Set a cap on the number to send at once since we need to know the limit ahead of time for task parcelling. 
-#define CUDA_CONSTANT_MEMORY_SIZE 66068
+// #define CUDA_CONSTANT_MEMORY_SIZE 66068
 #define MAX_NUM_QUERIES 512
 __device__ volatile int Cnum_nonzero_series = 0;
 __device__ volatile short Cnonzero_series_lengths[MAX_NUM_QUERIES];
@@ -366,43 +374,95 @@ float warpReduceSum(float val) {
   return val;
 }
 
+// Min/ max reduction code editied from: https://ernie55ernie.github.io/parallel%20programming/2018/03/17/cuda-maximum-value-with-parallel-reduction.html
 template <class T>
 __global__
 void mean_min_max_float(float *data, int data_length, float *threadblock_means, T *threadblock_mins, T *threadblock_maxs){
 
-  __shared__ float warp_sums[CUDA_WARP_WIDTH];
+	__shared__ float warp_sums[CUDA_WARP_WIDTH];
   
-  int pos = blockIdx.x*blockDim.x+threadIdx.x;
-  float warp_sum = 0;
-  if(pos < data_length){ // Coalesced global mem reads
-    warp_sum = data[pos]; 
-  }
-  __syncwarp();
+	extern __shared__ T cache[];
+	// extern __shared__ T min_cache[];
+  
+	T tmp_max = threadblock_maxs[0];
+	T tmp_min = threadblock_mins[0];
+  
+	int pos = blockIdx.x*blockDim.x+threadIdx.x;
+	float warp_sum = 0;
+	if(pos < data_length){ // Coalesced global mem reads
+		warp_sum = data[pos]; 
+	}
+	__syncwarp();
 
-  // Reduce the warp
-  warp_sum = warpReduceSum(warp_sum);
-  if(threadIdx.x%CUDA_WARP_WIDTH == 0){
-    warp_sums[threadIdx.x/CUDA_WARP_WIDTH] = warp_sum;
-  }
-  __syncwarp();
-  __syncthreads();
+	// Reduce the warp
+	warp_sum = warpReduceSum(warp_sum);
+	if(threadIdx.x%CUDA_WARP_WIDTH == 0){
+		warp_sums[threadIdx.x/CUDA_WARP_WIDTH] = warp_sum;
+	}
+	__syncwarp();
+	__syncthreads();
 
-  int warp_limit = DIV_ROUNDUP(blockDim.x,CUDA_WARP_WIDTH);
-  // Reduce the whole threadblock
-  if(threadIdx.x < CUDA_WARP_WIDTH){
-    warp_sum = threadIdx.x < warp_limit ? warp_sums[threadIdx.x] : 0;
-    __syncwarp();
-    warp_sum = warpReduceSum(warp_sum);
-  }
+	int warp_limit = DIV_ROUNDUP(blockDim.x,CUDA_WARP_WIDTH);
+	// Reduce the whole threadblock
+	if(threadIdx.x < CUDA_WARP_WIDTH){
+		warp_sum = threadIdx.x < warp_limit ? warp_sums[threadIdx.x] : 0;
+		__syncwarp();
+		warp_sum = warpReduceSum(warp_sum);
+	}
+  
+	int cacheIndex = threadIdx.x;
+  
+	while(pos < blockDim.x){
+		if(threadblock_maxs[pos] > tmp_max){
+			tmp_max = threadblock_maxs[pos];
+		}
+		if(threadblock_mins[pos] < tmp_min){
+			tmp_min = threadblock_mins[pos];
+		}
+		pos += blockDim.x * gridDim.x; 
+	}
+  
+	cache[cacheIndex] = tmp_max;
+	cache[cacheIndex + blockDim.x] = tmp_min;
+  
+	__syncthreads();
+  
+	// printf("cache[%i]: %f, cache[%i]: %f\n", cacheIndex, cache[cacheIndex], cacheIndex + blockDim.x, cache[cacheIndex + blockDim.x]);
+  
+	int ib = blockDim.x / 2;
+	// printf("ib: %i\n", ib);
+	while (ib != 0) {
+		// printf("cache[%i]: %f, cache[%i + %i]: %f\n", cacheIndex, cache[cacheIndex], cacheIndex, ib, cache[cacheIndex + ib]);
+		if(cacheIndex < ib && cache[cacheIndex + ib] > cache[cacheIndex]){
+			cache[cacheIndex] = cache[cacheIndex + ib]; 
+		}
+		// printf("cache[%i + %i]: %f, cache[%i+ %i + %i]: %f\n", blockDim.x, cacheIndex, cache[blockDim.x + cacheIndex], blockDim.x, cacheIndex, ib, cache[blockDim.x + cacheIndex + ib]);
+		if(cacheIndex < ib && cache[blockDim.x + cacheIndex + ib] < cache[blockDim.x + cacheIndex]){
+			cache[blockDim.x + cacheIndex] = cache[blockDim.x + cacheIndex + ib]; 
+		}
+		__syncthreads();
 
-  // Assign min/ max value to the front
-  threadblock_mins[0] = threadblock_mins[pos] < threadblock_mins[0] ? threadblock_mins[pos] : threadblock_mins[0];
-  threadblock_maxs[0] = threadblock_maxs[pos] > threadblock_maxs[0] ? threadblock_maxs[pos] : threadblock_maxs[0];
-  // Assign to global memory for later reduction across the whole data array
-  if(! threadIdx.x){
-    // Special condition in denominator for the last, potentially incomplete block
-    threadblock_means[blockIdx.x] = warp_sum/((blockIdx.x+1)*blockDim.x > data_length ? data_length-blockIdx.x*blockDim.x : blockDim.x);
-  }
+		ib /= 2;
+	}
+	
+	if(cacheIndex == 0){
+		threadblock_maxs[0] = cache[0];
+		threadblock_mins[0] = cache[blockDim.x];
+	}
+	// Assign min/ max value to the front
+	// threadblock_mins[0] = threadblock_mins[pos] < threadblock_mins[0] ? threadblock_mins[pos] : threadblock_mins[0];
+	// threadblock_maxs[0] = threadblock_maxs[pos] > threadblock_maxs[0] ? threadblock_maxs[pos] : threadblock_maxs[0];
+	// if(threadIdx.x == 0){
+		// for(int i = 0; i < blockDim.x; i++){
+			// threadblock_mins[0] = threadblock_mins[i] < threadblock_mins[0] ? threadblock_mins[i] : threadblock_mins[0];
+			// threadblock_maxs[0] = threadblock_maxs[i] > threadblock_maxs[0] ? threadblock_maxs[i] : threadblock_maxs[0];
+		// }
+	// }
+	// Assign to global memory for later reduction across the whole data array
+	if(! threadIdx.x){
+		// Special condition in denominator for the last, potentially incomplete block
+		threadblock_means[blockIdx.x] = warp_sum/((blockIdx.x+1)*blockDim.x > data_length ? data_length-blockIdx.x*blockDim.x : blockDim.x);
+	}
 }
 
 template <class T>
@@ -431,6 +491,7 @@ mean_min_max(T *data, int data_length, float *threadblock_means, T *threadblock_
   int pos = blockIdx.x*blockDim.x+threadIdx.x;
   float warp_sum = 0;
   if(pos < data_length){ // Coalesced global mem reads
+  // printf("data[%i]: %lf\n", pos, data[threadIdx.x]);
     threadblock_data[threadIdx.x] = data[pos];
     warp_sum = (double) threadblock_data[threadIdx.x]; // __shfl*() only works with int or float, the latter is the safest bet to retain true data values regardless of QTYPE
   }
@@ -457,6 +518,7 @@ mean_min_max(T *data, int data_length, float *threadblock_means, T *threadblock_
   int warp_limit = DIV_ROUNDUP(blockDim.x,CUDA_WARP_WIDTH);
   // Reduce the whole threadblock
   if(threadIdx.x < CUDA_WARP_WIDTH){
+	  //printf("threadIdx %i, Warp warp_limit (%i) warp_sums[threadIdx.x]: %f\n", threadIdx.x, threadIdx.x, warp_sums[threadIdx.x]);
     warp_sum = threadIdx.x < warp_limit ? warp_sums[threadIdx.x] : 0;
     for(int swath = 1; threadIdx.x+swath < warp_limit; swath *= 2){
       if(threadIdx.x%(swath*2) == 0){
@@ -465,13 +527,14 @@ mean_min_max(T *data, int data_length, float *threadblock_means, T *threadblock_
       }
     }
     __syncwarp();
-  //printf("Block %d, Warp reduce (%d) sum: %f\n", blockIdx.x, threadIdx.x, warp_sum);
+    // printf("Block %d, Warp reduce (%d) sum: %f\n", blockIdx.x, threadIdx.x, warp_sum);
     warp_sum = warpReduceSum(warp_sum);
   }
 
   // Assign to global memory for later reduction across the whole data array
   if(! threadIdx.x){
     // Special condition in denominator for the last, potentially incomplete block
+	// printf("%f/((%i+1)*%i, %i, %i-%i*%i, %i", warp_sum, blockIdx.x, blockDim.x, data_length, data_length, blockIdx.x, blockDim.x, blockDim.x);
     threadblock_means[blockIdx.x] = warp_sum/((blockIdx.x+1)*blockDim.x > data_length ? data_length-blockIdx.x*blockDim.x : blockDim.x);
     threadblock_mins[blockIdx.x] = warp_mins[0];
     threadblock_maxs[blockIdx.x] = warp_maxs[0];
@@ -601,6 +664,7 @@ get_znorm_stats(T *data, long data_length, float *mean, float *stddev, T *min, T
   while(num_threadblocks > 1){
     grid.x = DIV_ROUNDUP(num_threadblocks,CUDA_THREADBLOCK_MAX_THREADS);
     int threads = num_threadblocks > CUDA_THREADBLOCK_MAX_THREADS ? CUDA_THREADBLOCK_MAX_THREADS : num_threadblocks;
+	req_threadblock_shared_memory = sizeof(float)*CUDA_WARP_WIDTH + 2*num_threadblocks*sizeof(T);
     mean_min_max_float<T><<<grid,threads,req_threadblock_shared_memory,stream>>>(threadblock_means, num_threadblocks, threadblock_means, threadblock_mins, threadblock_maxs); CUERR("Reducing calculated data mean/min/max");
     num_threadblocks = grid.x;
   }
@@ -1829,9 +1893,11 @@ __inline__ __device__ void get_sorted_non_colinear_distances(QTYPE_ACC *sorted_n
 			bool extra_dist_taken = false;
 			// int values_taken_here = 0;
 			while(true){
+				// printf("%i * %i + %i = %i, %i * %i = %i\n", query_block_position, num_candidate_query_indices, dist_block_position, query_block_position * num_candidate_query_indices + dist_block_position, gridDim.x, blockDim.x, gridDim.x * blockDim.x);
 				if(query_block_position * num_candidate_query_indices + dist_block_position >= gridDim.x*blockDim.x){ 
 					break; // Check if we've gone past the bounds of query_adjacent_distances
 				}
+				// printf("query_adjacent_distances[%i * %i + %i]: %f\n", query_block_position, num_candidate_query_indices, dist_block_position, query_adjacent_distances[(query_block_position) * num_candidate_query_indices + dist_block_position]);
 				sorted_non_colinear_distances[cursor++] = query_adjacent_distances[(query_block_position++) * num_candidate_query_indices + dist_block_position];
 				if(extra_dist_taken){
 					break;
@@ -1873,6 +1939,7 @@ __inline__ __device__ void get_sorted_non_colinear_distances(QTYPE_ACC *sorted_n
 					sorted_non_colinear_distances[j] = tmp;
 				}
 			}
+			// printf("sorted_non_colinear_distances[%i]: %f\n", k, sorted_non_colinear_distances[k]);
 		}
 	} else{
 		int num_it = (*num_sorted_non_colinear_distances)/blockDim.x;
