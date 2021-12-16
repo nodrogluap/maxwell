@@ -39,6 +39,15 @@ typedef IntervalTree<size_t, std::string> ITree;
 
 // extern int STRAND;
 
+// Function that converts a string to char pointer
+// tmp_string - the string we want to convert_dna_to_shorts
+// returns converted char pointer
+char* stringToChar(std::string tmp_string){
+	char* cstr = (char*) malloc(tmp_string.size() + 1);
+	strcpy(cstr, tmp_string.c_str());
+	return cstr;
+}
+
 
 // Function that gets the number of values in a file
 // is - the input stream for the file
@@ -132,7 +141,7 @@ inline bool checkEnding(std::string const &fullString){
 // Function that gets all valid files in a directory and stores their file path into a vector
 // directory_path - path of the directory that contains all valid files
 // all_files - char array that will be populated with the full paths of all valid files
-// returns 1 if successful, 0 otherwise
+// returns number of compatible files if successful, 0 otherwise
 inline int getAllFilesFromDir(char* directory_path, char*** all_files){
 	// Code found and refactored from https://www.geeksforgeeks.org/c-program-list-files-sub-directories-directory/
 	std::string dir_path = directory_path;
@@ -168,6 +177,7 @@ inline int getAllFilesFromDir(char* directory_path, char*** all_files){
 	
 	*all_files = (char**)malloc(sizeof(char*)*num_compatible_files);
 	num_compatible_files = 0;
+	rewinddir(dr);
 	while ((de = readdir(dr)) != NULL){
 		std::string file_path = dir_path + de->d_name;
 		if(checkEnding(file_path)){
@@ -622,6 +632,12 @@ inline int scan_fasta_data(const char *fasta_file_name, size_t *num_sequences){
 	int local_seq_count_so_far = 0;
 	// One sequence per line, values tab separated.
 	std::ifstream f(fasta_file_name);
+	
+	if(!f.is_open()){
+		std::cerr << "Error: FastA file could not be read. Please provide a valid FastA file." << std::endl;
+		return 0;
+	}
+	
 	std::string line;
     while (!f.eof()) {
       getline(f,line);
