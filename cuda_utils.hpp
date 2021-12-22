@@ -400,6 +400,7 @@ read_tsv_data(const char *text_file_name, T **sequences, char **sequence_names, 
 	
 	std::ifstream ifs(text_file_name);
 	if(!ifs){
+		std::cerr << "Error reading in file " << text_file_name << " exiting" << std::endl;
 		return 0;
 	}
 	for(std::string line; std::getline(ifs, line); ){
@@ -491,6 +492,10 @@ int readSequenceFAST5Files(char **filenames, int num_files, T ***sequences, char
 		size_t seq_count_this_file = 0;
 		scan_fast5_data(filenames[i], &seq_count_this_file);
 		total_seq_count += seq_count_this_file;
+	}
+	if(total_seq_count == 0){
+		std::cerr << "No sequences found in Fast5 file. Exiting." << std::endl;
+		return 0;
 	}
 	std::cerr << ", total sequence count " << total_seq_count << std::endl;
 	std::cerr << "0%        10%       20%       30%       40%       50%       60%       70%       80%       90%       100%" << std::endl;

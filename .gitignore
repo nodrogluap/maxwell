@@ -38,6 +38,8 @@ tests/UCR_Suite/UCR_ED
 tests/UCR_Suite/UCR_ED_BIN
 tests/flash_dtw_test
 tests/segmentation_test
+tests/all_utils_test
+tests/cuda_utils_test
 segment_data
 *.exe
 *.out

@@ -43,8 +43,21 @@ TEST_CASE( " File Read " ) {
 
 TEST_CASE( " Count Lines " ) {
 	
-	SECTION("String with 2 lines"){
+	SECTION("String with 1 line"){
 		std::cerr << "------TEST 2------" << std::endl;
+		std::string s = "Hello World!\n";
+ 
+		std::vector<char> read_buffer(s.begin(), s.end());
+		
+		int result = CountLines(read_buffer, s.size());
+		
+		REQUIRE( result == 1 );
+		
+		std::cerr <<std::endl;
+	}
+	
+	SECTION("String with 2 lines"){
+		std::cerr << "------TEST 3------" << std::endl;
 		std::string s = "Hello World!\n This is a test line of a string\n";
  
 		std::vector<char> read_buffer(s.begin(), s.end());
@@ -56,13 +69,26 @@ TEST_CASE( " Count Lines " ) {
 		std::cerr <<std::endl;
 	}
 	
+	SECTION("String with no lines"){
+		std::cerr << "------TEST 4------" << std::endl;
+		std::string s = "";
+ 
+		std::vector<char> read_buffer(s.begin(), s.end());
+		
+		int result = CountLines(read_buffer, s.size());
+		
+		REQUIRE( result == 0 );
+		
+		std::cerr <<std::endl;
+	}
+	
 }
 
 TEST_CASE( " Has Ending " ) {
 	
 	SECTION("Matching Ending"){
 		
-		std::cerr << "------TEST 3------" << std::endl;
+		std::cerr << "------TEST 5------" << std::endl;
 		std::string test = "This is a test";
 		std::string end = "test";
 		
@@ -75,7 +101,7 @@ TEST_CASE( " Has Ending " ) {
 	
 	SECTION("Non-Matching Ending"){
 		
-		std::cerr << "------TEST 4------" << std::endl;
+		std::cerr << "------TEST 6------" << std::endl;
 		std::string test = "This is a test";
 		std::string end = "maxwell";
 		
@@ -101,7 +127,7 @@ TEST_CASE( " Is Bulk5 " ) {
 	
 	SECTION("Is Not a Bulk5 File"){
 
-		std::cerr << "------TEST 5------" << std::endl;
+		std::cerr << "------TEST 7------" << std::endl;
 		std::string non_bulk5_file = current_working_dir + "/good_files/fast5/MSI_20180314_FAH40082_MN24809_sequencing_run_mt237_3_brdu_mcginty_54076_read_229_ch_222_strand.fast5";
 		bool result = isBulkFast5(stringToChar(non_bulk5_file));
 		
@@ -116,7 +142,7 @@ TEST_CASE( " Check Ending " ) {
 	
 	SECTION("fast5 File"){
 		
-		std::cerr << "------TEST 6------" << std::endl;
+		std::cerr << "------TEST 8------" << std::endl;
 		std::string fast5_file = current_working_dir + "/good_files/fast5/MSI_20180314_FAH40082_MN24809_sequencing_run_mt237_3_brdu_mcginty_54076_read_229_ch_222_strand.fast5";
 		bool result = checkEnding(fast5_file);
 		
@@ -127,7 +153,7 @@ TEST_CASE( " Check Ending " ) {
 	
 	SECTION("txt File"){
 		
-		std::cerr << "------TEST 7------" << std::endl;
+		std::cerr << "------TEST 9------" << std::endl;
 		std::string txt_file = current_working_dir + "/good_files/text/good_test_query.txt";
 		bool result = checkEnding(txt_file);
 		
@@ -138,7 +164,7 @@ TEST_CASE( " Check Ending " ) {
 	
 	SECTION("fna File"){
 		
-		std::cerr << "------TEST 8------" << std::endl;
+		std::cerr << "------TEST 10------" << std::endl;
 		std::string fna_file = current_working_dir + "/good_files/fasta/fna/good_file.fna";
 		bool result = checkEnding(fna_file);
 		
@@ -149,7 +175,7 @@ TEST_CASE( " Check Ending " ) {
 	
 	SECTION("bin File"){
 		
-		std::cerr << "------TEST 9------" << std::endl;
+		std::cerr << "------TEST 11------" << std::endl;
 		std::string bin_file = current_working_dir + "/good_files/binary/coxsackie_a16_3prime.fna.bin";
 		bool result = checkEnding(bin_file);
 		
@@ -158,18 +184,20 @@ TEST_CASE( " Check Ending " ) {
 		std::cerr << std::endl;
 	}
 	
-	// TODO: Add tsv file to repo
-	// SECTION("tsv File"){
-		// std::string tsv_file = current_working_dir + "/good_files/some/path/to/tsv";
-		// bool result = checkEnding(tsv_file);
+	SECTION("tsv File"){
 		
-		// REQUIRE( result == true );
+		std::cerr << "------TEST 12------" << std::endl;
+		std::string tsv_file = current_working_dir + "/good_files/good_file.tsv";
+		bool result = checkEnding(tsv_file);
 		
-	// }
+		REQUIRE( result == true );
+		
+		std::cerr << std::endl;
+	}
 	
 	SECTION("Non-Matching File"){
 		
-		std::cerr << "------TEST 10------" << std::endl;
+		std::cerr << "------TEST 13------" << std::endl;
 		std::string fast5_file = current_working_dir + "/good_files/good.bed";
 		bool result = checkEnding(fast5_file);
 		
@@ -185,21 +213,21 @@ TEST_CASE( " Get All Files From Directory " ) {
 	
 	SECTION("Good Dir"){
 		
-		std::cerr << "------TEST 11------" << std::endl;
+		std::cerr << "------TEST 14------" << std::endl;
 		std::string good_dir = current_working_dir + "/empty_files";
 		
 		char** all_files;
 		
 		int result = getAllFilesFromDir(stringToChar(good_dir), &all_files);
 		
-		REQUIRE( result == 4 );
+		REQUIRE( result == 5 );
 		
 		std::cerr << std::endl;
 	}
 	
 	SECTION("Bad Dir"){
 		
-		std::cerr << "------TEST 12------" << std::endl;
+		std::cerr << "------TEST 15------" << std::endl;
 		std::string bad_dir = current_working_dir + "/path/to/bad/dir";
 		
 		char** all_files;
@@ -213,7 +241,7 @@ TEST_CASE( " Get All Files From Directory " ) {
 	
 	SECTION("No Files in Dir"){
 		
-		std::cerr << "------TEST 13------" << std::endl;
+		std::cerr << "------TEST 16------" << std::endl;
 		std::string no_files_dir = current_working_dir + "/UCR_Suite";
 		
 		char** all_files;
@@ -238,7 +266,7 @@ TEST_CASE( " Populate Tree " ) {
 
 	SECTION("Good file"){
 
-		std::cerr << "------TEST 14------" << std::endl;
+		std::cerr << "------TEST 17------" << std::endl;
 		int result = populateITree(bed_intervals, stringToChar(good_file), 1);
 
 		REQUIRE( result == 1 );
@@ -270,7 +298,7 @@ TEST_CASE( " Populate Tree " ) {
 
 	SECTION("Bad file"){
 
-		std::cerr << "------TEST 15------" << std::endl;
+		std::cerr << "------TEST 18------" << std::endl;
 		int result = populateITree(bed_intervals, stringToChar(bad_file), 1);
 
 		REQUIRE( result == 0 );
@@ -281,7 +309,7 @@ TEST_CASE( " Populate Tree " ) {
 
 	SECTION("Empty file"){
 
-		std::cerr << "------TEST 16------" << std::endl;
+		std::cerr << "------TEST 19------" << std::endl;
 		int result = populateITree(bed_intervals, stringToChar(empty_file), 1);
 
 		REQUIRE( result == 0 );
@@ -292,7 +320,7 @@ TEST_CASE( " Populate Tree " ) {
 
 	SECTION("Wrong file"){
 
-		std::cerr << "------TEST 17------" << std::endl;
+		std::cerr << "------TEST 20------" << std::endl;
 		int result = populateITree(bed_intervals, stringToChar(wrong_file), 1);
 
 		REQUIRE( result == 0 );
@@ -307,7 +335,7 @@ TEST_CASE( " Scan Fast5 Data " ) {
 	
 	SECTION("Good file"){
 		
-		std::cerr << "------TEST 18------" << std::endl;
+		std::cerr << "------TEST 21------" << std::endl;
 		std::string good_file = current_working_dir + "/good_files/fast5/MSI_20180314_FAH40082_MN24809_sequencing_run_mt237_3_brdu_mcginty_54076_read_229_ch_222_strand.fast5";
 		size_t num_sequences;
 		
@@ -321,7 +349,7 @@ TEST_CASE( " Scan Fast5 Data " ) {
 
 	SECTION("Bad file"){
 		
-		std::cerr << "------TEST 19------" << std::endl;
+		std::cerr << "------TEST 22------" << std::endl;
 		std::string bad_file = current_working_dir + "/nope/not/real.fast5";
 		size_t num_sequences;
 		
@@ -333,22 +361,22 @@ TEST_CASE( " Scan Fast5 Data " ) {
 	}
 
 	// TODO: See if we can get an empty fast5 file somehow
-	SECTION("Empty file"){
+	// SECTION("Empty file"){
 		
-		std::cerr << "------TEST 20------" << std::endl;
-		std::string empty_file = current_working_dir + "/empty_files/empty_test.fast5";
-		size_t num_sequences;
+		// std::cerr << "------TEST 23------" << std::endl;
+		// std::string empty_file = current_working_dir + "/empty_files/empty_test.fast5";
+		// size_t num_sequences;
 		
-		int result = scan_fast5_data(empty_file.c_str(), &num_sequences);
+		// int result = scan_fast5_data(empty_file.c_str(), &num_sequences);
 		
-		REQUIRE( result == FAST5_FILE_UNREADABLE );
+		// REQUIRE( result == FAST5_FILE_UNREADABLE );
 		
-		std::cerr << std::endl;
-	}
+		// std::cerr << std::endl;
+	// }
 
 	SECTION("Wrong file"){
 		
-		std::cerr << "------TEST 21------" << std::endl;
+		std::cerr << "------TEST 23------" << std::endl;
 		std::string wrong_file = current_working_dir + "/wrong_files/wrong_test.fast5";
 		size_t num_sequences;
 		
@@ -375,7 +403,7 @@ TEST_CASE( " Scan FastA Data " ) {
 	
 	SECTION("Good file"){
 		
-		std::cerr << "------TEST 22------" << std::endl;
+		std::cerr << "------TEST 24------" << std::endl;
 		std::string good_file = current_working_dir + "/good_files/fasta/fna/good_file.fna";
 		size_t num_sequences;
 		
@@ -389,7 +417,7 @@ TEST_CASE( " Scan FastA Data " ) {
 
 	SECTION("Bad file"){
 		
-		std::cerr << "------TEST 23------" << std::endl;
+		std::cerr << "------TEST 25------" << std::endl;
 		std::string bad_file = current_working_dir + "/nope/not/real.fna";
 		size_t num_sequences;
 		
@@ -402,7 +430,7 @@ TEST_CASE( " Scan FastA Data " ) {
 
 	SECTION("Empty file"){
 		
-		std::cerr << "------TEST 24------" << std::endl;
+		std::cerr << "------TEST 26------" << std::endl;
 		std::string empty_file = current_working_dir + "/empty_files/empty_test.fna";
 		size_t num_sequences;
 		
@@ -417,7 +445,7 @@ TEST_CASE( " Scan FastA Data " ) {
 	// TODO: Not sure how this should really run if some of the file contents are incorrect
 	SECTION("Wrong file"){
 		
-		std::cerr << "------TEST 25------" << std::endl;
+		std::cerr << "------TEST 27------" << std::endl;
 		std::string wrong_file = current_working_dir + "/wrong_files/wrong_test.fna";
 		size_t num_sequences;
 		
@@ -432,6 +460,47 @@ TEST_CASE( " Scan FastA Data " ) {
 }
 
 // TODO: get tsv file to run this test
-// TEST_CASE( " Scan TSV Data " ) {
+TEST_CASE( " Scan TSV Data " ) {
 	
-// }
+	SECTION("Good file"){
+		
+		std::cerr << "------TEST 28------" << std::endl;
+		std::string good_file = current_working_dir + "/good_files/good_file.tsv";
+		size_t num_sequences;
+		
+		int result = scan_tsv_data(good_file.c_str(), &num_sequences);
+		
+		REQUIRE( result == 1 );
+		REQUIRE( num_sequences == 2 );
+		
+		std::cerr << std::endl;
+	}
+
+	SECTION("Bad file"){
+		
+		std::cerr << "------TEST 29------" << std::endl;
+		std::string bad_file = current_working_dir + "/nope/not/real.tsv";
+		size_t num_sequences;
+		
+		int result = scan_tsv_data(bad_file.c_str(), &num_sequences);
+		
+		REQUIRE( result == 0 );
+		
+		std::cerr << std::endl;
+	}
+	
+	SECTION("Empty file"){
+		
+		std::cerr << "------TEST 30------" << std::endl;
+		std::string empty_file = current_working_dir + "/empty_files/empty_file.tsv";
+		size_t num_sequences;
+		
+		int result = scan_tsv_data(empty_file.c_str(), &num_sequences);
+		
+		REQUIRE( result == 1 );
+		REQUIRE( num_sequences == 0 );
+		
+		std::cerr << std::endl;
+	}
+	
+}
