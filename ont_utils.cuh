@@ -22,20 +22,20 @@
 #define RNA_KMER_LENGTH 5
 
 // Prototypes for methods to return a pointer to the converted signal in GPU memory (e.g. for further GPU kernel calls)
-__host__ int convert_rna_to_shorts(char *dna, long dna_length, short signal_type, short strand_types, short **global_gpu_mem_output_signal, long *signal_length, cudaStream_t stream);
+__host__ int convert_rna_to_shorts(char *rna, long rna_length, short signal_type, short strand_types, short **global_gpu_mem_output_signal, long *signal_length, cudaStream_t stream);
 __host__ int convert_dna_to_shorts(char *dna, long dna_length, short signal_type, short strand_types, short **global_gpu_mem_output_signal, long *signal_length, cudaStream_t stream);
 // Prototypes for methods to return the converted signal to the host
-__host__ short* convert_rna_to_shorts(char *dna, long dna_length, short signal_type, short strand_types, long *signal_length);
+__host__ short* convert_rna_to_shorts(char *rna, long rna_length, short signal_type, short strand_types, long *signal_length);
 __host__ short* convert_dna_to_shorts(char *dna, long dna_length, short signal_type, short strand_types, long *signal_length);
 
 // From ONT model: mean, std dev, std dev(std dev), std dev + std dev(std dev) as recapitulated in the #define *_SIGNAL constants above
 // perl -ane 'print(join(", ",map({int(10*$_)} $F[1], $F[2], $F[4], $F[2]+$F[4])), ",\n") unless $. == 1' kmer_models/r9.4_200mv_70bps_5mer_RNA/template_median68pA.model > rna.txt
 __device__ short rna_94_model[] = {
-1010, 27, 8, 35,
-975, 27, 8, 35,
-986, 27, 11, 38,
-966, 27, 7, 34,
-765, 34, 8, 43,
+1010, 27, 8, 35,	// Pico amperage estimate for kmer AAAAA is 1010
+975, 27, 8, 35,		// Pico amperage estimate for kmer AAAAC is 975
+986, 27, 11, 38,	// Pico amperage estimate for kmer AAAAG is 986
+966, 27, 7, 34,		// Pico amperage estimate for kmer AAAAT is 966
+765, 34, 8, 43,		// Pico amperage estimate for kmer AAACA is 765, etc
 807, 34, 10, 44,
 787, 34, 11, 45,
 811, 34, 8, 42,
@@ -1060,8 +1060,8 @@ __device__ short rna_94_model[] = {
 // From ONT model: mean, std dev, std dev(std dev), std dev + std dev(std dev)
 // perl -ane 'print(join(", ",map({int(10*$_)} $F[1], $F[2], $F[4], $F[2]+$F[4])), ",\n") unless $. == 1' kmer_models/r9.4_180mv_450bps_6mer/template_median68pA.model > dna.txt
 __device__ short dna_94_model[] = {
-864, 15, 6, 21,
-839, 15, 7, 22,
+864, 15, 6, 21,		// Pico amperage estimate for kmer AAAAAA is 864
+839, 15, 7, 22,		// Pico amperage estimate for kmer AAAAAC is 839, etc
 854, 15, 6, 21,
 844, 15, 7, 22,
 770, 17, 9, 26,
@@ -5175,21 +5175,15 @@ void rna2signal(char *rna, long rna_length, short signal_type, short strand_type
     }
     __syncthreads(); // ensure that the buffer is fully populated before proceeeding
     int model_idx = 0;
-	// char kmer_name[RNA_KMER_LENGTH+1];
+
     for(int i = 0; i < RNA_KMER_LENGTH; i++){
       // Treat any input not C, G, T or U as an A.
-	  // kmer_name[i] = rna_buffer[threadIdx.x+i];
-      model_idx += (1<<(i*2))*(rna_buffer[threadIdx.x+i] == 'T' || rna_buffer[threadIdx.x+i] == 'U' ? 3 : (rna_buffer[threadIdx.x+i] == 'G' ? 2 : (rna_buffer[threadIdx.x+i] == 'C' ? 1 : 0)));
+	  int buffer_pos = RNA_KMER_LENGTH-1-i;
+      model_idx += (1<<(i*2))*(rna_buffer[threadIdx.x+buffer_pos] == 'T' || rna_buffer[threadIdx.x+buffer_pos] == 'U' ? 3 : (rna_buffer[threadIdx.x+buffer_pos] == 'G' ? 2 : (rna_buffer[threadIdx.x+buffer_pos] == 'C' ? 1 : 0)));
     }
-	// char kmer_reversed[RNA_KMER_LENGTH+1];
-	// for(int i = 0; i < RNA_KMER_LENGTH; i++){
-		// kmer_reversed[i] = kmer_name[RNA_KMER_LENGTH-i-1];
-	// }
-	// kmer_name[RNA_KMER_LENGTH] = '\0';
-	// kmer_reversed[RNA_KMER_LENGTH] = '\0';
     // Output is reversed since RNA is read 3' to 5'
     if(strand_types & FORWARD_STRAND){
-      global_gpu_mem_output_signal[rna_length-pos-1] = rna_94_model[model_idx*4+signal_type];
+      global_gpu_mem_output_signal[pos] = rna_94_model[model_idx*4+signal_type];
 	  // if(signal_type == 0) printf("\nkmer_name: %s, kmer reversed: %s, model_idx: %i, rna_94_model[%i*4+%i]: %i, pos: %ld, rna_length-pos-1: %ld\n", kmer_name, kmer_reversed, model_idx, model_idx, signal_type, rna_94_model[model_idx*4+signal_type], pos, rna_length-pos-1);
       if(strand_types & COMPLEMENT_STRAND){
         model_idx = __brev(~model_idx) >> (sizeof(int)*8-2*RNA_KMER_LENGTH);
@@ -5208,19 +5202,23 @@ void rna2signal(char *rna, long rna_length, short signal_type, short strand_type
 __global__
 void dna2signal(char *dna, long dna_length, short signal_type, short strand_types, short *global_gpu_mem_output_signal){
   long pos = blockDim.x*blockIdx.x+threadIdx.x;
-  __shared__ char dna_buffer[CUDA_THREADBLOCK_MAX_THREADS+DNA_KMER_LENGTH];
-
-  // Coalesced global_memory reads and writes hopefully
-  if(pos + DNA_KMER_LENGTH < dna_length){ // bounds check for last block
+  __shared__ char dna_buffer[CUDA_THREADBLOCK_MAX_THREADS+DNA_KMER_LENGTH];\
+  
+  if(pos < dna_length){
     dna_buffer[threadIdx.x] = dna[pos];
-    if(threadIdx.x+DNA_KMER_LENGTH-1 > blockDim.x){ // last threads in the block need to grab the remaining kmer bases for the end of the shared block buffer 
+  }
+  // Coalesced global_memory reads and writes hopefully
+  if(pos + DNA_KMER_LENGTH - 1 < dna_length){ // bounds check for last block
+	if(threadIdx.x+DNA_KMER_LENGTH-1 > blockDim.x){ // last threads in the block need to grab the remaining kmer bases for the end of the shared block buffer 
        dna_buffer[threadIdx.x+DNA_KMER_LENGTH-1] = dna[pos+DNA_KMER_LENGTH-1];
     }
     __syncthreads(); // ensure that the buffer is fully populated before proceeeding
     int model_idx = 0;
-    for(int i = 0; i < DNA_KMER_LENGTH; i++){
+
+	for(int i = 0; i < DNA_KMER_LENGTH; i++){
        // Treat any input not C, G, or T as an A
-       model_idx += (1<<i)*(dna_buffer[threadIdx.x+i] == 'T' ? 3 : (dna_buffer[threadIdx.x+i] == 'G' ? 2 : (dna_buffer[threadIdx.x+i] == 'C' ? 1 : 0)));
+	   int buffer_pos = DNA_KMER_LENGTH-1-i;
+       model_idx += (1<<(i*2))*(dna_buffer[threadIdx.x+buffer_pos] == 'T' ? 3 : (dna_buffer[threadIdx.x+buffer_pos] == 'G' ? 2 : (dna_buffer[threadIdx.x+buffer_pos] == 'C' ? 1 : 0)));
     }
     if(strand_types & FORWARD_STRAND){
       global_gpu_mem_output_signal[pos] = dna_94_model[model_idx*4+signal_type];
@@ -5242,7 +5240,7 @@ __host__
 int convert_rna_to_shorts(char *cpu_mem_rna, long rna_length, short signal_type, short strand_types, short **global_gpu_mem_output_signal, long *signal_length, cudaStream_t stream=0){
   int num_blocks = DIV_ROUNDUP(rna_length, CUDA_THREADBLOCK_MAX_THREADS);
 
-  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*rna_length : rna_length;
+  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*(rna_length - (RNA_KMER_LENGTH - 1)) : (rna_length - (RNA_KMER_LENGTH - 1));
 
   cudaMalloc(global_gpu_mem_output_signal, sizeof(short)*(*signal_length)); CUERR("Allocating GPU memory for short representation of RNA");
   char *gpu_mem_rna;
@@ -5256,7 +5254,7 @@ __host__
 int convert_dna_to_shorts(char *cpu_mem_dna, long dna_length, short signal_type, short strand_types, short **global_gpu_mem_output_signal, long *signal_length, cudaStream_t stream=0){
   int num_blocks = DIV_ROUNDUP(dna_length, CUDA_THREADBLOCK_MAX_THREADS);
 
-  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*dna_length : dna_length;
+  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*(dna_length - (DNA_KMER_LENGTH - 1)) : (dna_length - (DNA_KMER_LENGTH - 1));
 
   cudaMalloc(global_gpu_mem_output_signal, sizeof(short)*(*signal_length)); CUERR("Allocating GPU memory for short representation of DNA"); 
   char *gpu_mem_dna;
@@ -5271,7 +5269,7 @@ __host__
 short* convert_rna_to_shorts(char *cpu_mem_rna, long rna_length, short signal_type, short strand_types, long *signal_length){
   int num_blocks = DIV_ROUNDUP(rna_length, CUDA_THREADBLOCK_MAX_THREADS);
 
-  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*rna_length : rna_length;
+  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*(rna_length - (RNA_KMER_LENGTH - 1)) : (rna_length - (RNA_KMER_LENGTH - 1));
 
   short *global_gpu_mem_output_signal;
   cudaMalloc(&global_gpu_mem_output_signal, sizeof(short)*(*signal_length)); CUERR("Allocating GPU memory for short representation of RNA");
@@ -5297,7 +5295,7 @@ __host__
 short* convert_dna_to_shorts(char *cpu_mem_dna, long dna_length, short signal_type, short strand_types, long *signal_length){
   int num_blocks = DIV_ROUNDUP(dna_length, CUDA_THREADBLOCK_MAX_THREADS);
 
-  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*dna_length : dna_length;
+  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*(dna_length - (DNA_KMER_LENGTH - 1)) : (dna_length - (DNA_KMER_LENGTH - 1));
 
   short *global_gpu_mem_output_signal;
   cudaMalloc(&global_gpu_mem_output_signal, sizeof(short)*(*signal_length)); CUERR("Allocating GPU memory for short representation of DNA");

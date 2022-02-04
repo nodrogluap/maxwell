@@ -126,26 +126,26 @@ read_fast5_data(const char *fast5_file_name, T **sequences, char **sequence_name
 	
 	int local_seq_count_so_far = 0;
 
-        hid_t file_id = H5Fopen(fast5_file_name, H5F_ACC_RDONLY, H5P_DEFAULT);
-        if(file_id < 0){ // No message, assume scan function called earlier provided these
-                return 0;
-        }
+	hid_t file_id = H5Fopen(fast5_file_name, H5F_ACC_RDONLY, H5P_DEFAULT);
+	if(file_id < 0){ // No message, assume scan function called earlier provided these
+		return 0;
+	}
 	bool old_format = true;
-        H5Eset_auto1(NULL, NULL);
-        // Old format, one read per file
+	H5Eset_auto1(NULL, NULL);
+	// Old format, one read per file
 	hid_t read_group = H5Gopen(file_id, "/Raw/Reads", H5P_DEFAULT);
 	if(read_group < 0){ // New formst, multiple reads per file
 		read_group = H5Gopen(file_id, "/", H5P_DEFAULT);
 		old_format = false;
-        }
+	}
 	hsize_t num_read_objects = 0;
-        if(read_group < 0 || H5Gget_num_objs(read_group, &num_read_objects)){
-                H5Gclose(read_group);
-                H5Fclose(file_id);
-                return 0;
-        }
-       	char *read_subgroup_name = NULL;
-        for(int i = 0; i < num_read_objects; ++i){
+	if(read_group < 0 || H5Gget_num_objs(read_group, &num_read_objects)){
+		H5Gclose(read_group);
+		H5Fclose(file_id);
+		return 0;
+	}
+	char *read_subgroup_name = NULL;
+	for(int i = 0; i < num_read_objects; ++i){
 		ssize_t name_size = H5Gget_objname_by_idx(read_group, i, NULL, 0);
 		if(name_size < 5){
 			continue; // Too short to be "[Rr]ead_..."
@@ -160,10 +160,10 @@ read_fast5_data(const char *fast5_file_name, T **sequences, char **sequence_name
 		}
 		name_size = H5Gget_objname_by_idx(read_group, i, read_subgroup_name, name_size);
 		// Should have the form Read_# (old) or read_????? (new)
-                if(name_size < 5 || (read_subgroup_name[0] != 'R' && read_subgroup_name[0] != 'r') || read_subgroup_name[1] != 'e' || read_subgroup_name[2] != 'a' || read_subgroup_name[3] != 'd' || read_subgroup_name[4] != '_'){
+		if(name_size < 5 || (read_subgroup_name[0] != 'R' && read_subgroup_name[0] != 'r') || read_subgroup_name[1] != 'e' || read_subgroup_name[2] != 'a' || read_subgroup_name[3] != 'd' || read_subgroup_name[4] != '_'){
 			std::cerr << "Skipping " << read_subgroup_name << " as it does not follow the naming convention" << std::endl;
-                        continue;
-                }
+			continue;
+		}
 		hid_t signal_dataset_id = 0;
 		if(old_format){
 			signal_dataset_id = H5Dopen(file_id, (CONCAT3("/Raw/Reads/",read_subgroup_name,"/Signal")).c_str(), H5P_DEFAULT);
@@ -173,12 +173,12 @@ read_fast5_data(const char *fast5_file_name, T **sequences, char **sequence_name
 		}
 		if(signal_dataset_id < 0){
 			std::cerr << "Skipping " << read_subgroup_name << " Signal, H5DOpen failed" << std::endl;
-                        continue;
+			continue;
 		}
 		hid_t signal_dataspace_id = H5Dget_space(signal_dataset_id);
 		if(signal_dataspace_id < 0){
 			std::cerr << "Skipping " << read_subgroup_name << " Signal, cannot get the data space" << std::endl;
-                        continue;
+			continue;
 		}
 		const hsize_t read_length = H5Sget_simple_extent_npoints(signal_dataspace_id);
 		if(read_length < 1){
@@ -206,7 +206,7 @@ read_fast5_data(const char *fast5_file_name, T **sequences, char **sequence_name
 		sequences[i] = t_seq;
 		sequence_lengths[i] = read_length;
 		cudaMallocHost(&sequence_names[local_seq_count_so_far], name_size); CUERR("Cannot allocate CPU memory for reading sequence name from FAST5 file");
-                memcpy(sequence_names[local_seq_count_so_far], read_subgroup_name, name_size);
+		memcpy(sequence_names[local_seq_count_so_far], read_subgroup_name, name_size);
 
 		H5Dclose(signal_dataset_id);
 		local_seq_count_so_far++;
@@ -370,17 +370,17 @@ read_binary_data(const char *binary_file_name, T **output_vals, size_t *num_outp
 		std::cerr << "Error reading in file " << binary_file_name << " exiting" << std::endl;
 		return 0;
 	}
+	if((*num_output_vals) == 0){
+		std::cerr << binary_file_name << " is empty. Exiting" << std::endl;
+		return 0;
+	}
 
 	T *out = 0;
 	cudaMallocHost(&out, sizeof(T)*n); CUERR("Cannot allocate CPU memory for reading sequence from file");
 
 	ifs.seekg(0, std::ios::beg);
 	ifs.read((char *) out, n);
-	
-	for(int i = 0; i < n/sizeof(T); i++){
-		std::cerr << out[i] << ", ";
-	}
-	std::cerr << std::endl;
+
 	// Only set the output if all the data was succesfully read in.
 	*output_vals = out;
 	return 1;
@@ -620,13 +620,17 @@ int readSequenceBULK5Files(char **filenames, int num_files, T ***sequences, char
 template<typename T>
 int readSequenceFASTAFiles(char **filenames, int num_files, T ***sequences, char ***sequence_names, size_t **sequence_lengths, int rna, short signal_type, short strand_flags){
 	
-	std::cerr << "Step 1 of 3: Loading " << num_files << (num_files == 1 ? " FAST5 data file" : " FAST5 data files");
+	std::cerr << "Step 1 of 3: Loading " << num_files << (num_files == 1 ? " FASTA data file" : " FASTA data files");
 	// Need two passes: 1st figure out how many sequences there are, then in the 2nd we read the sequences into memory.
 	size_t total_seq_count = 0;
 	for(int i = 0; i < num_files; ++i){
 		size_t seq_count_this_file = 0;
 		scan_fasta_data(filenames[i], &seq_count_this_file);
 		total_seq_count += seq_count_this_file;
+	}
+	if(total_seq_count == 0){
+		std::cerr << "No sequences found in FastA file. Exiting." << std::endl;
+		return 0;
 	}
 	std::cerr << ", total sequence count " << total_seq_count << std::endl;
 	std::cerr << "0%        10%       20%       30%       40%       50%       60%       70%       80%       90%       100%" << std::endl;
@@ -637,6 +641,7 @@ int readSequenceFASTAFiles(char **filenames, int num_files, T ***sequences, char
 	int dotsPrinted = 0;
 	char spinner[4] = { '|', '/', '-', '\\'};
 	int actual_count = 0;
+	int sequence_position = 0;
 	for(int i = 0; i < num_files; ++i){
 		int newDotTotal = 100*((float) i/(num_files-1));
 		if(newDotTotal > dotsPrinted){
@@ -655,15 +660,38 @@ int readSequenceFASTAFiles(char **filenames, int num_files, T ***sequences, char
 		
 		std::string line;
 		long input_length = 0;
-		int sequence_position = 0;
+		long num_seqs_this_file = 0;
 		while (!f.eof()) {
-			getline(f,line);
+			std::getline(f,line);
 			if (line.length() == 0) // blank or header line
 				continue;
 			else if(line[0] == '>'){
-				char seq_name_c[line.size() + 1];
-				strcpy(seq_name_c, line.c_str());
-				*sequence_names[sequence_position] = seq_name_c;
+				if(input_length != 0){
+					short* tmp_vals = 0;
+					long num_seqs_this_input = 0;
+					// std::cerr << input << std::endl;
+					if(rna){
+						tmp_vals = convert_rna_to_shorts(input, input_length, signal_type, strand_flags, &num_seqs_this_input);	
+					} else{
+						tmp_vals = convert_dna_to_shorts(input, input_length, signal_type, strand_flags, &num_seqs_this_input);
+					}
+					(*sequences)[sequence_position] = shortToTemplate<T>(tmp_vals, (long long)num_seqs_this_input);
+					(*sequence_lengths)[sequence_position] = (size_t)num_seqs_this_input;
+					actual_count += (size_t)num_seqs_this_input;
+					num_seqs_this_file += (size_t)num_seqs_this_input;
+					input_length = 0;
+					sequence_position++;
+				}
+				int name_size = line.size() + 1;
+				char* seq_name_c = (char *) std::malloc(name_size);
+				std::strcpy(seq_name_c, line.c_str());
+				
+				// if(sequence_position == 0){
+				cudaMallocHost(&((*sequence_names)[sequence_position]), name_size); CUERR("Cannot allocate CPU memory for reading sequence name from FASTA file");
+				memcpy((*sequence_names)[sequence_position], seq_name_c, name_size);
+				// std::cerr << (*sequence_names)[sequence_position] << std::endl;
+				// }
+				free(seq_name_c);
 			}
 			else{
 				// Note that the following only works for ASCII, which is what a sane FastA file is encoded as.
@@ -673,24 +701,26 @@ int readSequenceFASTAFiles(char **filenames, int num_files, T ***sequences, char
 			}
 		}
 		f.close();
-		
-		long num_seqs_this_file = 0;
-		if(rna){
-			(*sequences)[actual_count] = shortToTemplate<T>(convert_rna_to_shorts(input, input_length, signal_type, strand_flags, &num_seqs_this_file), (long long)num_seqs_this_file);
-		} else{
-			(*sequences)[actual_count] = shortToTemplate<T>(convert_dna_to_shorts(input, input_length, signal_type, strand_flags, &num_seqs_this_file), (long long)num_seqs_this_file);
-		}
-		(*sequence_lengths)[actual_count] = (size_t)num_seqs_this_file;
-		if(num_seqs_this_file < 1){
+		if(num_seqs_this_file == 0){
 			std::cerr << "Error reading in FAST5 file " << filenames[i] << ", skipping" << std::endl;
+			continue;
 		}
-		else{
-			actual_count += (size_t)num_seqs_this_file;
+		num_seqs_this_file = 0;
+		if(rna){
+			(*sequences)[sequence_position] = shortToTemplate<T>(convert_rna_to_shorts(input, input_length, signal_type, strand_flags, &num_seqs_this_file), (long long)num_seqs_this_file);
+		} else{
+			(*sequences)[sequence_position] = shortToTemplate<T>(convert_dna_to_shorts(input, input_length, signal_type, strand_flags, &num_seqs_this_file), (long long)num_seqs_this_file);
 		}
+		(*sequence_lengths)[sequence_position] = (size_t)num_seqs_this_file;
+		sequence_position++;
+	}
+	if(actual_count == 0){
+		std::cerr << "No data was read from any FAST5 files." << std::endl;
+		return 0;
 	}
 	if(dotsPrinted < 100){while(dotsPrinted++ < 99){std::cerr << ".";} std::cerr << "|";}
 	std::cerr << std::endl;
-	return actual_count;
+	return sequence_position;
 	
 }
 
@@ -730,6 +760,10 @@ int readSequenceBinaryFiles(char **filenames, int num_files, T ***sequences, cha
 			actual_count++;
 		}
 		(*sequence_names)[i] = filenames[i];
+	}
+	if(actual_count == 0){
+		std::cerr << "No data was read from any binary files." << std::endl;
+		return 0;
 	}
 	if(dotsPrinted < 100){while(dotsPrinted++ < 99){std::cerr << ".";} std::cerr << "|";}
 	std::cerr << std::endl;
@@ -803,6 +837,10 @@ merge_data(T **input_vals, size_t *num_input_vals, std::vector< std::pair<size_t
 	for(int i = 0; i < num_seq; i++){
 		*total_vals += num_input_vals[i];
 	}
+	if(*total_vals == 0){
+		std::cerr << "No data given. Exiting." << std::endl;
+		return 0;
+	}
 	
 	T* all_values = 0; 
 	cudaMallocHost(&all_values, sizeof(T)*(*total_vals)); CUERR("Allocating CPU memory for all values");
@@ -810,6 +848,9 @@ merge_data(T **input_vals, size_t *num_input_vals, std::vector< std::pair<size_t
 	size_t total_vals_copied = 0;
 	for(int i = 0; i < num_seq; i++){
 		size_t tmp_val = num_input_vals[i];
+		if(tmp_val == 0){
+			continue;
+		}
 		cudaMemcpy(&all_values[total_vals_copied], input_vals[i], tmp_val*sizeof(T), cudaMemcpyHostToHost);
 		total_vals_copied += tmp_val;
 		cudaFreeHost(input_vals[i]);		CUERR("Free CPU input vals");
@@ -830,6 +871,7 @@ merge_data(T **input_vals, size_t *num_input_vals, std::vector< std::pair<size_t
 // signal_type - the type of signal being read in from a fasta file
 // strand_flags - flag that determines the strand to read in from a fasta file
 // returns the total number of sequences read in from the files
+// TODO: add compatible files (bin and tsv)
 template <class T>
 int
 read_data(char **filenames, int num_files, T ***output_vals, char ***sequence_names, size_t **num_output_vals, int instrand, int rna, short signal_type, short strand_flags){
@@ -839,9 +881,12 @@ read_data(char **filenames, int num_files, T ***output_vals, char ***sequence_na
 	size_t total_seq_count = 0;
 	
 	for(int i = 0; i < num_files; ++i){
+		if(!checkEnding(std::string(filenames[i]))){
+			continue;
+		}
 		size_t seq_count_this_file = 0;
 		char tmp_filename[256];
-		strcpy(tmp_filename, *filenames);
+		strcpy(tmp_filename, filenames[i]);
 		char *extension;
 		char *ptr = strtok(tmp_filename, ".");
 		while(ptr = strtok(NULL, ".")) {
@@ -869,13 +914,20 @@ read_data(char **filenames, int num_files, T ***output_vals, char ***sequence_na
 		}
 		total_seq_count += seq_count_this_file;
 	}
+	if(total_seq_count == 0){
+		std::cerr << "No valid files found. Exiting." << std::endl;
+		return 0;
+	}
 	
 	cudaMallocHost(output_vals, sizeof(T *)*total_seq_count);				CUERR("Allocating cpu memory for values");
 	cudaMallocHost(sequence_names, sizeof(char *)*total_seq_count);       CUERR("Allocating cpu memory for names");
 	cudaMallocHost(num_output_vals, sizeof(size_t)*total_seq_count);      CUERR("Allocating cpu memory for num values");
 	for(int i = 0; i < num_files; i++){
+		if(!checkEnding(std::string(filenames[i]))){
+			continue;
+		}
 		char tmp_filename[256];
-		strcpy(tmp_filename, *filenames);
+		strcpy(tmp_filename, filenames[i]);
 		char *extension;
 		char *ptr = strtok(tmp_filename, ".");
 		while(ptr = strtok(NULL, ".")) {
@@ -907,9 +959,9 @@ read_data(char **filenames, int num_files, T ***output_vals, char ***sequence_na
 			tmp_count = readSequenceBinaryFiles(&filenames[i], 1, &tmp_out_vals, &tmp_names, &tmp_num_vals);
 		}
 		for(int j = 0; j < tmp_count; j++){
-			(*output_vals)[j] = tmp_out_vals[j];
-			(*sequence_names)[j] = tmp_names[j];
-			(*num_output_vals)[j] = tmp_num_vals[j];
+			(*output_vals)[total_count+j] = tmp_out_vals[j];
+			(*sequence_names)[total_count+j] = tmp_names[j];
+			(*num_output_vals)[total_count+j] = tmp_num_vals[j];
 		}
 		total_count += tmp_count;
 		std::cerr << "total count: " << total_count << std::endl;
