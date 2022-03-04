@@ -26,8 +26,8 @@
 #include "../cuda_utils.h" // CUERR() and timer functions
 #include "../cuda_utils.hpp" // Needed for reading in binary data
 
-#define QTYPE_double
-#define QTYPE_ACC_double
+#define QTYPE_float
+#define QTYPE_ACC_float
 
 #ifndef MINIDTW_STRIDE
 #define MINIDTW_STRIDE 1
@@ -46,10 +46,10 @@ std::string current_working_dir(cur_dir_char);
 TEST_CASE( " Get Znorm Stats " ){
 
 	std::string good_file = current_working_dir + "/good_files/binary/coxsackie_a16_3prime.fna.bin0";
-	QTYPE *good_subject_values;
-	size_t num_subject_values;
-	int result = read_binary_data<QTYPE>(good_file.c_str(), &good_subject_values, &num_subject_values);
-
+	QTYPE *query_values;
+	size_t num_query_values;
+	int result = read_binary_data<QTYPE>(good_file.c_str(), &query_values, &num_query_values);
+	
 	float *mean;
 	float *stddev;
 	QTYPE *min;
@@ -64,17 +64,17 @@ TEST_CASE( " Get Znorm Stats " ){
 		std::cerr << "------TEST ZNORM_STATS GOOD DATA------" << std::endl;
 
 		// std::cerr << "Subject : ";
-		// for(int i = 0; i < num_subject_values; i++){
-			// std::cerr << good_subject_values[i] << ", ";
+		// for(int i = 0; i < num_query_values; i++){
+			// std::cerr << query_values[i] << ", ";
 		// }
-		std::cerr << std::endl;
+		// std::cerr << std::endl;
 
 		QTYPE *data;
-		cudaMalloc(&data, sizeof(QTYPE)*num_subject_values);		CUERR("Allocating data");
+		cudaMalloc(&data, sizeof(QTYPE)*num_query_values);		CUERR("Allocating data");
 
-		cudaMemcpy(data, good_subject_values, sizeof(QTYPE)*num_subject_values, cudaMemcpyHostToDevice);			CUERR("Copying data");
+		cudaMemcpy(data, query_values, sizeof(QTYPE)*num_query_values, cudaMemcpyHostToDevice);			CUERR("Copying data");
 		
-		get_znorm_stats(data, num_subject_values, mean, stddev, min, max);
+		get_znorm_stats(data, num_query_values, mean, stddev, min, max);
 
 		float return_mean;
 		float return_stddev;
@@ -366,7 +366,7 @@ TEST_CASE(" Hard DTW "){
 
 		flash_dtw_setup(good_query_values, num_query_values, NO_ZNORM);
 
-		std::cerr << "Running hard_dtw (" << griddim_dtw_test.x << ", " << griddim_dtw_test.y << ", " << griddim_dtw_test.z << ")" << std::endl;
+		// std::cerr << "Running hard_dtw (" << griddim_dtw_test.x << ", " << griddim_dtw_test.y << ", " << griddim_dtw_test.z << ")" << std::endl;
 		int threadblock_size_dtw_test = CUDA_THREADBLOCK_MAX_THREADS;
 		hard_dtw<<<griddim_dtw_test, threadblock_size_dtw_test, 0, 0>>>(num_query_indices_test, get_subject_pointer(), get_subject_std_pointer(), query_adjacent_candidates_test, query_adjacent_distances_test, minidtw_size); CUERR("Running DTW anchor distance calculations")
 
@@ -378,13 +378,13 @@ TEST_CASE(" Hard DTW "){
 
 		// std::cerr << "num_subject_values: " << num_subject_values << ", num_query_values: " << num_query_values << std::endl;
 
-		std::cerr << "Distances: ";
-		for(int i = 0; i < mem_size_test; i++){
-			if(return_distances[i] == 0){
-				std::cerr << return_distances[i] << ", " <<  return_candidates[i] << " - " << i << ", ";
-			}
-		}
-		std::cerr << std::endl;
+		// std::cerr << "Distances: ";
+		// for(int i = 0; i < mem_size_test; i++){
+			// if(return_distances[i] == 0){
+				// std::cerr << return_distances[i] << ", " <<  return_candidates[i] << " - " << i << ", ";
+			// }
+		// }
+		// std::cerr << std::endl;
 
 		REQUIRE( return_distances[20] == 0 );
 		REQUIRE( return_candidates[20] == 400 );
@@ -714,17 +714,17 @@ TEST_CASE("Sorted NonColinear Distances"){
 		set_mem[i] = i % 2 == 0 ? 0 : -1;
 	}		
 		
-	std::cerr << "Distances: ";
-	for(int i = 0; i < dtw_dist_size; i++){
-		std::cerr << dtw_dists[i] << ", ";
-	}
-	std::cerr << std::endl;
+	// std::cerr << "Distances: ";
+	// for(int i = 0; i < dtw_dist_size; i++){
+		// std::cerr << dtw_dists[i] << ", ";
+	// }
+	// std::cerr << std::endl;
 	
-	std::cerr << "Mem: ";
-	for(int i = 0; i < num_candidate_query_indices; i++){
-		std::cerr << set_mem[i] << ", ";
-	}
-	std::cerr << std::endl;
+	// std::cerr << "Mem: ";
+	// for(int i = 0; i < num_candidate_query_indices; i++){
+		// std::cerr << set_mem[i] << ", ";
+	// }
+	// std::cerr << std::endl;
 
 	short* membership;
 	cudaMalloc(&membership, sizeof(short)*num_candidate_query_indices);			CUERR("Allocating membership");
@@ -880,11 +880,11 @@ TEST_CASE("Sorted NonColinear Distances"){
 			set_mem_test[i] = i % 2 == 0 ? 0 : 1;
 		}		
 		
-		std::cerr << "Mem test: ";
-		for(int i = 0; i < num_candidate_query_indices; i++){
-			std::cerr << set_mem_test[i] << ", ";
-		}
-		std::cerr << std::endl;
+		// std::cerr << "Mem test: ";
+		// for(int i = 0; i < num_candidate_query_indices; i++){
+			// std::cerr << set_mem_test[i] << ", ";
+		// }
+		// std::cerr << std::endl;
 	
 		short* membership_test;
 		cudaMalloc(&membership_test, sizeof(short)*num_candidate_query_indices);			CUERR("Allocating membership");
@@ -908,11 +908,11 @@ TEST_CASE("Sorted NonColinear Distances"){
 		QTYPE_ACC *return_sorted_dists = (QTYPE_ACC *)malloc(sizeof(QTYPE_ACC)*2*num_sorted_non_colinear_distances);
 		cudaMemcpy(return_sorted_dists, sorted_non_colinear_distances, sizeof(QTYPE_ACC)*2*num_sorted_non_colinear_distances, cudaMemcpyDeviceToHost); 		CUERR("Copying sorted dists from device to host");
 
-		std::cerr << "Return sorted non distances: ";
-		for(int i = 0; i < 2*num_sorted_non_colinear_distances; i++){
-			std::cerr << return_sorted_dists[i] << ", ";
-		}
-		std::cerr << std::endl;
+		// std::cerr << "Return sorted non distances: ";
+		// for(int i = 0; i < 2*num_sorted_non_colinear_distances; i++){
+			// std::cerr << return_sorted_dists[i] << ", ";
+		// }
+		// std::cerr << std::endl;
 
 		REQUIRE(return_sorted_dists[0] == 1);
 		REQUIRE(return_sorted_dists[1] == 2);
@@ -1086,16 +1086,16 @@ TEST_CASE(" Calculate Pvals "){
 		REQUIRE( return_output_left_anchors_subject[0] == 0 );
 		REQUIRE( return_output_right_anchors_subject[0] == 9 );
 
-		std::cerr << "return_output_pvals: ";
-		for(int i = 0; i < return_num_results_recorded; i++){
-			std::cerr << return_output_pvals[i] << ", ";
-		}
-		std::cerr << std::endl;
-		std::cerr << "return_output_num_members: ";
-		for(int i = 0; i < return_num_results_recorded; i++){
-			std::cerr << return_output_num_members[i] << ", ";
-		}
-		std::cerr << std::endl;
+		// std::cerr << "return_output_pvals: ";
+		// for(int i = 0; i < return_num_results_recorded; i++){
+			// std::cerr << return_output_pvals[i] << ", ";
+		// }
+		// std::cerr << std::endl;
+		// std::cerr << "return_output_num_members: ";
+		// for(int i = 0; i < return_num_results_recorded; i++){
+			// std::cerr << return_output_num_members[i] << ", ";
+		// }
+		// std::cerr << std::endl;
 
 		cudaFree(num_results_recorded);              CUERR("Freeing num results recorded")
 		cudaFree(num_results_notrecorded);           CUERR("Freeing num results not recorded")
@@ -1557,7 +1557,7 @@ TEST_CASE(" Block Find Min "){
 			dtw_dists[i] = 255 + (i / 256) - counter;
 			if(++counter == 256) counter = 0;
 		}
-		std::cerr << std::endl;
+		// std::cerr << std::endl;
 
 		cudaMemcpy(dtw_results_device, dtw_dists, sizeof(QTYPE)*dtw_dist_size, cudaMemcpyHostToDevice);
 

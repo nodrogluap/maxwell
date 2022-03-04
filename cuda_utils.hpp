@@ -380,6 +380,7 @@ read_binary_data(const char *binary_file_name, T **output_vals, size_t *num_outp
 
 	ifs.seekg(0, std::ios::beg);
 	ifs.read((char *) out, n);
+	ifs.close();
 
 	// Only set the output if all the data was succesfully read in.
 	*output_vals = out;

@@ -47,6 +47,9 @@ all_utils_test: all_utils_test.cu ../all_utils.hpp
 cuda_utils_test: cuda_utils_test.cu ../cuda_utils.hpp ../all_utils.hpp ../ont_utils.cuh
 	$(NVCC) $(CXX11) $(DEBUG) $(CUDA_DEBUG) -I$(INCLUDE_HDF5_LINUX) -DHDF5_SUPPORTED=1 cuda_utils_test.cu -o cuda_utils_test -L$(ZLIB_LIB_LINUX) $(ZLIB_FLAGS_LINUX) -L$(HDF5_LIB_LINUX) $(HDF5_FLAGS_LINUX) -L$(VBZ_LIB_LINUX) $(VBZ_FLAGS_LINUX)
 	
+ont_utils_test: ont_utils_test.cu ../ont_utils.cuh
+	$(NVCC) $(CXX11) $(DEBUG) $(CUDA_DEBUG) -DHDF5_SUPPORTED=1 ont_utils_test.cu -o ont_utils_test
+	
 #----Windows----#
 
 #----Include Directories----#

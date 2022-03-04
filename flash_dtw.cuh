@@ -491,7 +491,7 @@ mean_min_max(T *data, int data_length, float *threadblock_means, T *threadblock_
   int pos = blockIdx.x*blockDim.x+threadIdx.x;
   float warp_sum = 0;
   if(pos < data_length){ // Coalesced global mem reads
-  // printf("data[%i]: %lf\n", pos, data[threadIdx.x]);
+	// printf("data[%i]: %lf\n", pos, data[threadIdx.x]);
     threadblock_data[threadIdx.x] = data[pos];
     warp_sum = (double) threadblock_data[threadIdx.x]; // __shfl*() only works with int or float, the latter is the safest bet to retain true data values regardless of QTYPE
   }
@@ -534,7 +534,7 @@ mean_min_max(T *data, int data_length, float *threadblock_means, T *threadblock_
   // Assign to global memory for later reduction across the whole data array
   if(! threadIdx.x){
     // Special condition in denominator for the last, potentially incomplete block
-	// printf("%f/((%i+1)*%i, %i, %i-%i*%i, %i", warp_sum, blockIdx.x, blockDim.x, data_length, data_length, blockIdx.x, blockDim.x, blockDim.x);
+	// printf("%f/((%i+1)*%i, %i, %i-%i*%i, %i\n", warp_sum, blockIdx.x, blockDim.x, data_length, data_length, blockIdx.x, blockDim.x, blockDim.x);
     threadblock_means[blockIdx.x] = warp_sum/((blockIdx.x+1)*blockDim.x > data_length ? data_length-blockIdx.x*blockDim.x : blockDim.x);
     threadblock_mins[blockIdx.x] = warp_mins[0];
     threadblock_maxs[blockIdx.x] = warp_maxs[0];
@@ -1931,6 +1931,7 @@ __inline__ __device__ void get_sorted_non_colinear_distances(QTYPE_ACC *sorted_n
 			dist_block_position++;
 		}
 		
+		// Might want to implement a faster sort here
 		for(int k = 0; k < (*num_sorted_non_colinear_distances)-1; k++){
 			for(int j = k; j < (*num_sorted_non_colinear_distances)-1; j++){
 				if(sorted_non_colinear_distances[k] > sorted_non_colinear_distances[j]){
@@ -2349,7 +2350,12 @@ thorough_calc_anchor_candidates_colinear_pvals(const long long *query_adjacent_c
 
 	// end of sorted_colinear_distances
 	
-	QTYPE_ACC *sorted_non_colinear_distances = (QTYPE_ACC *) &global_non_colinear_distances[CUDA_THREADBLOCK_MAX_THREADS*(threadIdx.x%expected_num_pvals)+CUDA_THREADBLOCK_MAX_THREADS*expected_num_pvals*blockIdx.x];
+	int thread_specific_location = CUDA_THREADBLOCK_MAX_THREADS*(threadIdx.x%expected_num_pvals)+CUDA_THREADBLOCK_MAX_THREADS*expected_num_pvals*blockIdx.x;
+	QTYPE_ACC *sorted_non_colinear_distances = (QTYPE_ACC *) &global_non_colinear_distances[thread_specific_location];
+	
+	if(thread_specific_location > threadIdx.x*num_candidate_query_indices){
+		return;
+	}
 	
 	// TODO needs testing for small num_candidate_subject_indices
 	int num_sorted_non_colinear_distances = 0;

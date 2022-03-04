@@ -5157,6 +5157,21 @@ __device__ short dna_94_model[] = {
 906, 15, 6, 21,
 906, 15, 5, 20};
 
+
+// Code obtained from https://stackoverflow.com/questions/12205054/how-to-reverse-an-int-but-grouped-by-2-bit-in-c
+__device__
+uint32_t reverseByTwo(uint32_t value) {
+    int i;
+    uint32_t new_value = 0;
+    for (i = 0; i < 16; i++)
+    {
+        new_value <<= 2;            
+        new_value |= (value & 0x3);
+        value >>= 2;
+    }
+    return new_value;
+}
+
 // Flips the locations since RNA is read 3' to 5'
 __global__
 void rna2signal(char *rna, long rna_length, short signal_type, short strand_types, short *global_gpu_mem_output_signal){
@@ -5174,7 +5189,7 @@ void rna2signal(char *rna, long rna_length, short signal_type, short strand_type
       rna_buffer[threadIdx.x+RNA_KMER_LENGTH-1] = rna[pos+RNA_KMER_LENGTH-1];
     }
     __syncthreads(); // ensure that the buffer is fully populated before proceeeding
-    int model_idx = 0;
+    uint32_t model_idx = 0;
 
     for(int i = 0; i < RNA_KMER_LENGTH; i++){
       // Treat any input not C, G, T or U as an A.
@@ -5186,15 +5201,15 @@ void rna2signal(char *rna, long rna_length, short signal_type, short strand_type
       global_gpu_mem_output_signal[pos] = rna_94_model[model_idx*4+signal_type];
 	  // if(signal_type == 0) printf("\nkmer_name: %s, kmer reversed: %s, model_idx: %i, rna_94_model[%i*4+%i]: %i, pos: %ld, rna_length-pos-1: %ld\n", kmer_name, kmer_reversed, model_idx, model_idx, signal_type, rna_94_model[model_idx*4+signal_type], pos, rna_length-pos-1);
       if(strand_types & COMPLEMENT_STRAND){
-        model_idx = __brev(~model_idx) >> (sizeof(int)*8-2*RNA_KMER_LENGTH);
-        global_gpu_mem_output_signal[2*rna_length-pos-2] = rna_94_model[model_idx*4+signal_type];
+        model_idx = reverseByTwo(~model_idx) >> (sizeof(uint32_t)*8-2*RNA_KMER_LENGTH);
+        global_gpu_mem_output_signal[2*(rna_length-RNA_KMER_LENGTH)-pos+1] = rna_94_model[model_idx*4+signal_type];
       }
     }
     else if(strand_types & COMPLEMENT_STRAND){
-      // The bitwise representation of the kmers means that we can invert the bits to do complement: A->T (00 -> 11), C->G (01 -> 10), G->T (10 -> 01), T->A (11 -> 00)
-      // then use the intrinsic bit reversing function of CUDA to get the reverse complement (shift since we only use some of the integer bits).
-      model_idx = __brev(~model_idx) >> (sizeof(int)*8-2*RNA_KMER_LENGTH);
-      global_gpu_mem_output_signal[rna_length-pos-1] = rna_94_model[model_idx*4+signal_type];
+      // The bitwise representation of the kmers means that we can invert the bits to do complement: A->T (00 -> 11), C->G (01 -> 10), G->C (10 -> 01), T->A (11 -> 00)
+      // then reverse bits as base 4 to get the reverse complement (shift since we only use some of the integer bits).
+      model_idx = reverseByTwo(~model_idx) >> (sizeof(uint32_t)*8-2*RNA_KMER_LENGTH);
+      global_gpu_mem_output_signal[rna_length-RNA_KMER_LENGTH-pos] = rna_94_model[model_idx*4+signal_type];
     }
   }
 }
@@ -5202,7 +5217,7 @@ void rna2signal(char *rna, long rna_length, short signal_type, short strand_type
 __global__
 void dna2signal(char *dna, long dna_length, short signal_type, short strand_types, short *global_gpu_mem_output_signal){
   long pos = blockDim.x*blockIdx.x+threadIdx.x;
-  __shared__ char dna_buffer[CUDA_THREADBLOCK_MAX_THREADS+DNA_KMER_LENGTH];\
+  __shared__ char dna_buffer[CUDA_THREADBLOCK_MAX_THREADS+DNA_KMER_LENGTH];
   
   if(pos < dna_length){
     dna_buffer[threadIdx.x] = dna[pos];
@@ -5213,7 +5228,7 @@ void dna2signal(char *dna, long dna_length, short signal_type, short strand_type
        dna_buffer[threadIdx.x+DNA_KMER_LENGTH-1] = dna[pos+DNA_KMER_LENGTH-1];
     }
     __syncthreads(); // ensure that the buffer is fully populated before proceeeding
-    int model_idx = 0;
+    uint32_t model_idx = 0;
 
 	for(int i = 0; i < DNA_KMER_LENGTH; i++){
        // Treat any input not C, G, or T as an A
@@ -5224,13 +5239,13 @@ void dna2signal(char *dna, long dna_length, short signal_type, short strand_type
       global_gpu_mem_output_signal[pos] = dna_94_model[model_idx*4+signal_type];
       if(strand_types & COMPLEMENT_STRAND){
         // Reverse and complement the kmer model key bits. Bit shift amount should optimize out to a constant in any sane compiler.
-        model_idx = __brev(~model_idx) >> (sizeof(int)*8-2*DNA_KMER_LENGTH);
-        global_gpu_mem_output_signal[dna_length+pos] = dna_94_model[model_idx*4+signal_type];
+        model_idx = reverseByTwo(~model_idx) >> (sizeof(uint32_t)*8-2*DNA_KMER_LENGTH);
+        global_gpu_mem_output_signal[2*(dna_length-DNA_KMER_LENGTH)-pos+1] = dna_94_model[model_idx*4+signal_type];
       }
     }
     else if(strand_types & COMPLEMENT_STRAND){
-      model_idx = __brev(~model_idx) >> (sizeof(int)*8-2*DNA_KMER_LENGTH);
-      global_gpu_mem_output_signal[pos] = dna_94_model[model_idx*4+signal_type];
+      model_idx = reverseByTwo(~model_idx) >> (sizeof(uint32_t)*8-2*DNA_KMER_LENGTH);
+      global_gpu_mem_output_signal[dna_length-DNA_KMER_LENGTH-pos] = dna_94_model[model_idx*4+signal_type];
     }
   }
 }
@@ -5240,7 +5255,7 @@ __host__
 int convert_rna_to_shorts(char *cpu_mem_rna, long rna_length, short signal_type, short strand_types, short **global_gpu_mem_output_signal, long *signal_length, cudaStream_t stream=0){
   int num_blocks = DIV_ROUNDUP(rna_length, CUDA_THREADBLOCK_MAX_THREADS);
 
-  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*(rna_length - (RNA_KMER_LENGTH - 1)) : (rna_length - (RNA_KMER_LENGTH - 1));
+  *signal_length = strand_types & FORWARD_STRAND && strand_types & COMPLEMENT_STRAND ? 2*(rna_length - (RNA_KMER_LENGTH - 1)) : (rna_length - (RNA_KMER_LENGTH - 1));
 
   cudaMalloc(global_gpu_mem_output_signal, sizeof(short)*(*signal_length)); CUERR("Allocating GPU memory for short representation of RNA");
   char *gpu_mem_rna;
@@ -5254,7 +5269,7 @@ __host__
 int convert_dna_to_shorts(char *cpu_mem_dna, long dna_length, short signal_type, short strand_types, short **global_gpu_mem_output_signal, long *signal_length, cudaStream_t stream=0){
   int num_blocks = DIV_ROUNDUP(dna_length, CUDA_THREADBLOCK_MAX_THREADS);
 
-  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*(dna_length - (DNA_KMER_LENGTH - 1)) : (dna_length - (DNA_KMER_LENGTH - 1));
+  *signal_length = strand_types & FORWARD_STRAND && strand_types & COMPLEMENT_STRAND ? 2*(dna_length - (DNA_KMER_LENGTH - 1)) : (dna_length - (DNA_KMER_LENGTH - 1));
 
   cudaMalloc(global_gpu_mem_output_signal, sizeof(short)*(*signal_length)); CUERR("Allocating GPU memory for short representation of DNA"); 
   char *gpu_mem_dna;
@@ -5269,7 +5284,7 @@ __host__
 short* convert_rna_to_shorts(char *cpu_mem_rna, long rna_length, short signal_type, short strand_types, long *signal_length){
   int num_blocks = DIV_ROUNDUP(rna_length, CUDA_THREADBLOCK_MAX_THREADS);
 
-  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*(rna_length - (RNA_KMER_LENGTH - 1)) : (rna_length - (RNA_KMER_LENGTH - 1));
+  *signal_length = strand_types & FORWARD_STRAND && strand_types & COMPLEMENT_STRAND ? 2*(rna_length - (RNA_KMER_LENGTH - 1)) : (rna_length - (RNA_KMER_LENGTH - 1));
 
   short *global_gpu_mem_output_signal;
   cudaMalloc(&global_gpu_mem_output_signal, sizeof(short)*(*signal_length)); CUERR("Allocating GPU memory for short representation of RNA");
@@ -5295,7 +5310,7 @@ __host__
 short* convert_dna_to_shorts(char *cpu_mem_dna, long dna_length, short signal_type, short strand_types, long *signal_length){
   int num_blocks = DIV_ROUNDUP(dna_length, CUDA_THREADBLOCK_MAX_THREADS);
 
-  *signal_length = signal_type & FORWARD_STRAND & COMPLEMENT_STRAND ? 2*(dna_length - (DNA_KMER_LENGTH - 1)) : (dna_length - (DNA_KMER_LENGTH - 1));
+  *signal_length = strand_types & FORWARD_STRAND && strand_types & COMPLEMENT_STRAND ? 2*(dna_length - (DNA_KMER_LENGTH - 1)) : (dna_length - (DNA_KMER_LENGTH - 1));
 
   short *global_gpu_mem_output_signal;
   cudaMalloc(&global_gpu_mem_output_signal, sizeof(short)*(*signal_length)); CUERR("Allocating GPU memory for short representation of DNA");

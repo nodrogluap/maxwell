@@ -113,7 +113,8 @@ template <class T>
 __global__ void get_sorted_non_colinear_distances_kernel(QTYPE_ACC *sorted_non_colinear_distances, T* membership, const QTYPE_ACC *query_adjacent_distances, int* total_num_sorted_non_colinear_distances, const int num_candidate_query_indices, const int num_candidate_subject_indices, int* non_colinear_distance_lengths, int num_sorted_colinear_distances, bool thorough_calc){
 
 	// extern __shared__ char shared[];
-	QTYPE_ACC *my_thread_specific_sorted_non_colinear_distances = (QTYPE_ACC *) &sorted_non_colinear_distances[CUDA_THREADBLOCK_MAX_THREADS*(threadIdx.x%num_candidate_query_indices)+CUDA_THREADBLOCK_MAX_THREADS*num_candidate_query_indices*blockIdx.x];
+	int my_thread_specific_location = CUDA_THREADBLOCK_MAX_THREADS*(threadIdx.x%num_candidate_query_indices)+CUDA_THREADBLOCK_MAX_THREADS*num_candidate_query_indices*blockIdx.x;
+	QTYPE_ACC *my_thread_specific_sorted_non_colinear_distances = (QTYPE_ACC *) &sorted_non_colinear_distances[my_thread_specific_location];
 	int bid = blockIdx.x*blockDim.x;
 
 	int num_sorted_non_colinear_distances = 0;
@@ -125,18 +126,20 @@ __global__ void get_sorted_non_colinear_distances_kernel(QTYPE_ACC *sorted_non_c
 	}
 	__syncthreads();
 
-	if(num_members == 0){
+	if(num_members == 0 || my_thread_specific_location > threadIdx.x*num_candidate_query_indices){
 		return;
 	}
 	
-	printf("Thread specific %i*(%i / %i)+%i*%i*%i: %i\n", CUDA_THREADBLOCK_MAX_THREADS, threadIdx.x, num_candidate_query_indices, CUDA_THREADBLOCK_MAX_THREADS, num_candidate_query_indices, blockIdx.x, CUDA_THREADBLOCK_MAX_THREADS*(threadIdx.x%num_candidate_query_indices)+CUDA_THREADBLOCK_MAX_THREADS*num_candidate_query_indices*blockIdx.x);
+	// printf("Thread specific %i*(%i / %i)+%i*%i*%i: %i\n", CUDA_THREADBLOCK_MAX_THREADS, threadIdx.x, num_candidate_query_indices, CUDA_THREADBLOCK_MAX_THREADS, num_candidate_query_indices, blockIdx.x, CUDA_THREADBLOCK_MAX_THREADS*(threadIdx.x%num_candidate_query_indices)+CUDA_THREADBLOCK_MAX_THREADS*num_candidate_query_indices*blockIdx.x);
 
 	// if(thorough_calc){
 		get_sorted_non_colinear_distances<T>(my_thread_specific_sorted_non_colinear_distances, membership, num_members, query_adjacent_distances, &num_sorted_non_colinear_distances, num_candidate_query_indices, num_candidate_subject_indices, thorough_calc, 0, num_sorted_colinear_distances, false);
 		
-		for(int j = 0; j < num_sorted_non_colinear_distances; j++){
-			printf("sorted_non_colinear_distances[%i]: %f\n",j ,sorted_non_colinear_distances[j]);
-		}
+		// if(threadIdx.x+blockIdx.x*blockDim.x == 0){
+			// for(int j = 0; j < num_sorted_non_colinear_distances; j++){
+			// 	printf("sorted_non_colinear_distances[%i]: %f, sorted_non_colinear_distances[%i]: %f\n", 0, sorted_non_colinear_distances[0], 256, sorted_non_colinear_distances[256]);
+			// }
+		// }
 		(*total_num_sorted_non_colinear_distances) += num_sorted_non_colinear_distances;
 		non_colinear_distance_lengths[bid] = num_sorted_non_colinear_distances;
 	// } else{
