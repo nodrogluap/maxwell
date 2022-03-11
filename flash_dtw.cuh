@@ -2353,6 +2353,8 @@ thorough_calc_anchor_candidates_colinear_pvals(const long long *query_adjacent_c
 	int thread_specific_location = CUDA_THREADBLOCK_MAX_THREADS*(threadIdx.x%expected_num_pvals)+CUDA_THREADBLOCK_MAX_THREADS*expected_num_pvals*blockIdx.x;
 	QTYPE_ACC *sorted_non_colinear_distances = (QTYPE_ACC *) &global_non_colinear_distances[thread_specific_location];
 	
+	
+	// Out of bounds check for unit test. Not sure if global memory allocation needs to be adjusted so that this check is required
 	if(thread_specific_location > threadIdx.x*num_candidate_query_indices){
 		return;
 	}

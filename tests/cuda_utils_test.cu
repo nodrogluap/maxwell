@@ -305,7 +305,6 @@ TEST_CASE( " Read Sequence Text Files " ) {
 		size_t* num_query_values;
 		size_t result = 0;
 		
-		stringToChar(good_file);
 		result = readSequenceTextFiles(&filenames[0], 1, &query_values, &query_names, &num_query_values);
 		
 		REQUIRE( result == 1 );
